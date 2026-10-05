@@ -1,0 +1,2107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>CrumbSave — Вечерние сюрприз-наборы еды в Алматы</title>
+  
+  <!-- Основной продуктовый шрифт Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- QRCode.js CDN для генерации настоящего читаемого QR-кода -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bgCanvas: 'var(--bg)',
+            surface: 'var(--surface)',
+            surfaceMuted: 'var(--surface-muted)',
+            charcoal: 'var(--text)',
+            slateText: 'var(--text-secondary)',
+            borderLine: 'var(--border)',
+            brand: 'var(--brand)',
+            brandHover: 'var(--brand-hover)',
+            brandSoft: 'var(--brand-soft)',
+            urgent: 'var(--urgent)',
+            urgentSoft: 'var(--urgent-soft)',
+            colorError: 'var(--error)',
+            kaspiRed: 'var(--kaspi)',
+            focusRing: 'var(--focus)',
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Дизайн-токены CrumbSave (Раздел 06 спецификации RU-2) */
+    :root {
+      --bg: #faf9f6;
+      --surface: #ffffff;
+      --surface-muted: #f2f3ef;
+      --text: #202522;
+      --text-secondary: #626a65;
+      --border: #dce2dc;
+      --brand: #1f5750;
+      --brand-hover: #184840;
+      --brand-soft: #e8f2ee;
+      --urgent: #a94831;
+      --urgent-soft: #fbede7;
+      --error: #b42318;
+      --kaspi: #d92d20;
+      --focus: #0b6d62;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --radius-control: 14px;
+      --radius-card: 18px;
+      --radius-sheet: 28px;
+      --shadow-card: 0 2px 8px rgb(25 40 32 / 5%);
+      --phone-outer: #1e211e;
+    }
+
+    html.dark {
+      --bg: #151816;
+      --surface: #1E2320;
+      --surface-muted: #272E2A;
+      --text: #F2F4F2;
+      --text-secondary: #9BA49E;
+      --border: #2D3631;
+      --brand: #2B7A70;
+      --brand-hover: #338C81;
+      --brand-soft: #1E332C;
+      --urgent: #C4573D;
+      --urgent-soft: #38241F;
+      --error: #E5483D;
+      --kaspi: #F14635;
+      --focus: #3ABBAA;
+      --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.35);
+      --phone-outer: #0F1210;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #111412;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, textarea {
+      font-family: inherit;
+      font-size: inherit;
+    }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; }
+    button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .numeric { font-variant-numeric: tabular-nums; }
+    
+    .phone-shadow {
+      box-shadow: 0 25px 60px -15px rgba(0,0,0,0.6), 0 0 0 12px var(--phone-outer), 0 0 0 14px #383F3A;
+    }
+
+    .card-shadow {
+      box-shadow: var(--shadow-card);
+    }
+
+    .sheet-shadow {
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Мягкая радарная пульсация и свечение иконки геолокации */
+    @keyframes radar-pulse {
+      0% {
+        transform: scale(0.9);
+        opacity: 0.85;
+      }
+      50% {
+        opacity: 0.45;
+      }
+      100% {
+        transform: scale(2.3);
+        opacity: 0;
+      }
+    }
+    .radar-ring {
+      animation: radar-pulse 2.2s cubic-bezier(0.15, 0.85, 0.35, 1) infinite;
+    }
+
+    @keyframes beacon-glow {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(46, 125, 91, 0.45), 0 3px 8px rgba(0, 0, 0, 0.15);
+      }
+      50% {
+        box-shadow: 0 0 16px 6px rgba(46, 125, 91, 0.6), 0 3px 10px rgba(0, 0, 0, 0.2);
+      }
+    }
+    .geo-beacon {
+      animation: beacon-glow 2.2s ease-in-out infinite;
+    }
+
+    /* Вырезы для Passbook билета */
+    .ticket-notch-left, .ticket-notch-right {
+      position: absolute;
+      top: 154px;
+      width: 24px;
+      height: 24px;
+      border-radius: 9999px;
+      background: var(--bg);
+      z-index: 10;
+    }
+    .ticket-notch-left {
+      left: -12px;
+      box-shadow: inset -2px 0 3px rgba(0,0,0,0.04);
+    }
+    .ticket-notch-right {
+      right: -12px;
+      box-shadow: inset 2px 0 3px rgba(0,0,0,0.04);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-charcoal flex flex-col items-center justify-center bg-[#F4F1EA] dark:bg-[#0D100F] sm:py-6 p-0 transition-colors duration-200">
+
+  <!-- ==================================================================== -->
+  <!-- ВЕРХНЯЯ ПАНЕЛЬ НАВИГАЦИИ ПО ПРОТОТИПУ (Переключение экранов 1–7)     -->
+  <!-- ==================================================================== -->
+  <header class="mb-3 px-2 py-1 bg-[#171B19]/95 backdrop-blur-md border border-[#2B3530] rounded-2xl flex items-center justify-center text-xs text-white shadow-xl z-50">
+    <!-- Навигатор экранов 1–7 -->
+    <nav class="flex items-center justify-center gap-1 overflow-x-auto no-scrollbar" aria-label="Навигация по экранам прототипа">
+      <button onclick="setScreen('screen-loc')" id="nav-screen-loc" class="px-2 py-1 rounded-[8px] font-medium text-neutral-400 hover:text-neutral-200 transition text-[11px] whitespace-nowrap">1. Гео</button>
+      <button onclick="setScreen('screen-feed')" id="nav-screen-feed" class="active px-2 py-1 rounded-[8px] font-semibold bg-[#23352D] text-emerald-300 shadow-xs transition text-[11px] whitespace-nowrap">2. Лента</button>
+      <button onclick="setScreen('screen-empty')" id="nav-screen-empty" class="px-2 py-1 rounded-[8px] font-medium text-neutral-400 hover:text-neutral-200 transition text-[11px] whitespace-nowrap">3. Пусто</button>
+      <button onclick="setScreen('screen-detail')" id="nav-screen-detail" class="px-2 py-1 rounded-[8px] font-medium text-neutral-400 hover:text-neutral-200 transition text-[11px] whitespace-nowrap">4. Товар</button>
+      <button onclick="setScreen('screen-checkout')" id="nav-screen-checkout" class="px-2 py-1 rounded-[8px] font-medium text-neutral-400 hover:text-neutral-200 transition text-[11px] whitespace-nowrap">5. Оплата</button>
+      <button onclick="setScreen('screen-ticket')" id="nav-screen-ticket" class="px-2 py-1 rounded-[8px] font-medium text-neutral-400 hover:text-neutral-200 transition text-[11px] whitespace-nowrap">6. Билет</button>
+      <button onclick="setScreen('screen-rate')" id="nav-screen-rate" class="px-2 py-1 rounded-[8px] font-medium text-neutral-400 hover:text-neutral-200 transition text-[11px] whitespace-nowrap">7. Отзыв</button>
+    </nav>
+  </header>
+
+  <!-- ==================================================================== -->
+  <!-- ОСНОВНОЙ КОНТЕЙНЕР ПРИЛОЖЕНИЯ (Раздел 07: .app-shell, max-w-[430px]) -->
+  <!-- ==================================================================== -->
+  <main id="app-shell" class="app-shell relative w-full sm:max-w-[430px] h-[100dvh] sm:h-[880px] bg-bgCanvas sm:border sm:border-borderLine sm:rounded-[28px] overflow-hidden sm:shadow-2xl flex flex-col select-none transition-colors duration-200">
+
+    <!-- КОНТЕЙНЕР ЭКРАНОВ ПРИЛОЖЕНИЯ -->
+    <div class="relative w-full flex-1 overflow-hidden">
+
+        <!-- ============================================================== -->
+        <!-- ЭКРАН 1: ОНБОРДИНГ И ГЕОЛОКАЦИЯ                                -->
+        <!-- ============================================================== -->
+        <section id="screen-loc" class="screen absolute inset-0 flex flex-col justify-between p-5 bg-bgCanvas z-10 hidden">
+          <!-- Верх: Кнопка «Пропустить» -->
+          <div class="flex items-center justify-end pt-0.5">
+            <button onclick="setScreen('screen-feed')" class="text-xs font-semibold text-slateText hover:text-charcoal px-2 py-1 flex items-center gap-1 transition" aria-label="Пропустить выбор геолокации">
+              <span>Пропустить</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5 stroke-[2]"></i>
+            </button>
+          </div>
+
+          <!-- ЖИВАЯ КАРТА АЛМАТЫ С ПИНАМИ ЗАВЕДЕНИЙ (Достык/Абая) -->
+          <div class="relative w-full h-[320px] bg-[#EBE5DB] dark:bg-[#1E2321] rounded-2xl border border-borderLine overflow-hidden p-3 shadow-inner">
+            <!-- Сетка улиц Алматы SVG -->
+            <svg class="absolute inset-0 w-full h-full opacity-70" viewBox="0 0 353 320" fill="none">
+              <path d="M-20 70 L380 70" stroke="#DDD5C7" class="dark:stroke-[#2B332F]" stroke-width="14" />
+              <path d="M-20 200 L380 200" stroke="#DDD5C7" class="dark:stroke-[#2B332F]" stroke-width="18" />
+              <path d="M125 -20 L125 340" stroke="#DDD5C7" class="dark:stroke-[#2B332F]" stroke-width="16" />
+              <path d="M265 -20 L265 340" stroke="#DDD5C7" class="dark:stroke-[#2B332F]" stroke-width="12" />
+              <path d="M-20 135 L380 135" stroke="#DDD5C7" class="dark:stroke-[#2B332F]" stroke-width="8" stroke-dasharray="4 4" />
+              <rect x="145" y="88" width="105" height="95" rx="10" fill="#D3E2D6" class="dark:fill-[#203027]" />
+              <text x="133" y="28" fill="#9C9283" class="dark:fill-[#6A756F]" font-size="9" font-weight="700" font-family="Inter, sans-serif">пр. Достык</text>
+              <text x="12" y="194" fill="#9C9283" class="dark:fill-[#6A756F]" font-size="9" font-weight="700" font-family="Inter, sans-serif">пр. Абая</text>
+              <text x="12" y="64" fill="#9C9283" class="dark:fill-[#6A756F]" font-size="8" font-weight="600" font-family="Inter, sans-serif">ул. Курмангазы</text>
+            </svg>
+
+            <!-- Пин 1: Paul Bakery -->
+            <div id="pin-paul" onclick="openDetail('paul-bakery-demo')" class="cursor-pointer absolute top-[42px] left-[85px] bg-surface px-2.5 py-1.5 rounded-[10px] card-shadow border border-borderLine flex items-center gap-2 z-20 hover:scale-105 transition">
+              <img src="https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=80&auto=format&fit=crop&q=80" alt="Paul" class="w-6 h-6 rounded-md object-cover">
+              <span class="text-[11px] font-bold text-charcoal">Paul Bakery</span>
+              <span class="text-[10px] bg-surfaceMuted text-charcoal px-1.5 py-0.5 rounded-[6px] font-medium">2 набора</span>
+            </div>
+
+            <!-- Пин 2: Coffee Boom -->
+            <div id="pin-coffee" onclick="setScreen('screen-feed')" class="cursor-pointer absolute bottom-[75px] right-[20px] bg-surface px-2.5 py-1.5 rounded-[10px] card-shadow border border-borderLine flex items-center gap-2 z-20 hover:scale-105 transition">
+              <img src="https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=80&auto=format&fit=crop&q=80" alt="Coffee" class="w-6 h-6 rounded-md object-cover">
+              <span class="text-[11px] font-bold text-charcoal">Coffee Boom</span>
+              <span class="text-[10px] bg-urgentSoft text-urgent px-1.5 py-0.5 rounded-[6px] font-bold">1 набор</span>
+            </div>
+
+            <!-- Пин 3: Urban Fork Deli -->
+            <div id="pin-urban" onclick="setScreen('screen-feed')" class="cursor-pointer absolute bottom-[20px] left-[35px] bg-surface px-2.5 py-1.5 rounded-[10px] card-shadow border border-borderLine flex items-center gap-2 z-20 hover:scale-105 transition">
+              <img src="https://images.unsplash.com/photo-1540420773420-3366772f4999?w=80&auto=format&fit=crop&q=80" alt="Urban" class="w-6 h-6 rounded-md object-cover">
+              <span class="text-[11px] font-bold text-charcoal">Urban Fork</span>
+              <span class="text-[10px] bg-surfaceMuted text-charcoal px-1.5 py-0.5 rounded-[6px] font-medium">3 набора</span>
+            </div>
+
+            <!-- Точка «Вы здесь» со спокойным свечением иконки -->
+            <div id="user-location-marker" class="absolute top-[175px] left-[135px] -translate-x-1/2 -translate-y-1/2 z-10 flex items-center justify-center">
+              <div class="absolute w-14 h-14 rounded-full bg-brand/15 radar-ring pointer-events-none"></div>
+              <div class="w-7 h-7 rounded-full bg-brand geo-beacon flex items-center justify-center text-white shadow-lg border-2 border-surface transition-shadow">
+                <i data-lucide="navigation" class="w-3.5 h-3.5 fill-white stroke-[2]"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Текстовый блок -->
+          <div class="px-1 pt-2">
+            <h2 class="text-[26px] font-extrabold text-charcoal leading-[32px] tracking-tight">
+              Любимые заведения. Цены до&nbsp;−70%
+            </h2>
+            <p class="text-sm text-slateText mt-2 leading-[22px]">
+              Пекарни и кафе предлагают вечерние сюрприз-наборы дешевле. Выберите набор и заберите его в указанное время.
+            </p>
+          </div>
+
+          <!-- Кнопки действий -->
+          <div class="space-y-2 pb-2 pt-2">
+            <button onclick="requestUserLocation()" id="btn-request-location" class="w-full h-[50px] bg-brand hover:bg-brandHover active:scale-[0.98] text-white font-bold text-sm rounded-[14px] shadow-sm flex items-center justify-center gap-2.5 transition">
+              <i data-lucide="map-pin" class="w-4 h-4 shrink-0 stroke-[2]"></i>
+              <span>Показать наборы рядом</span>
+            </button>
+            <button onclick="openDistrictModal()" id="btn-manual-district" class="w-full h-10 text-brand dark:text-emerald-400 font-bold text-xs rounded-[12px] flex items-center justify-center hover:underline transition">
+              Выбрать район вручную
+            </button>
+            <p class="text-[11px] text-center text-slateText leading-tight">
+              Можно продолжить без геолокации
+            </p>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- ЭКРАН 2: ГЛАВНАЯ ЛЕНТА (КАТАЛОГ НАБОРОВ - Раздел 16)           -->
+        <!-- ============================================================== -->
+        <section id="screen-feed" class="screen absolute inset-0 flex flex-col bg-bgCanvas transition-colors duration-200 z-10">
+          <!-- Шапка: Локация слева, поиск справа (без дублирующей кнопки карты) -->
+          <div class="px-5 pt-1 pb-2 flex items-center justify-between gap-2 shrink-0">
+            <button onclick="openDistrictModal()" class="h-9 px-3.5 bg-surface border border-borderLine rounded-full flex items-center gap-1.5 card-shadow active:scale-95 transition min-w-0" title="Изменить район" aria-label="Выбрать район и радиус поиска">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-brand stroke-[2] shrink-0"></i>
+              <span id="feed-location-label" class="text-xs font-semibold text-charcoal whitespace-nowrap truncate">Бостандык · 3 км</span>
+              <i data-lucide="chevron-down" class="w-3 h-3 text-slateText stroke-[2] shrink-0"></i>
+            </button>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button onclick="toggleSearchBar()" id="btn-toggle-search" title="Поиск наборов" class="w-9 h-9 flex items-center justify-center text-charcoal hover:text-brand transition" aria-label="Открыть строку поиска">
+                <i data-lucide="search" class="w-5 h-5 stroke-[1.75]"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Выдвижная строка поиска по заведениям и блюдам -->
+          <div id="search-bar-row" class="px-5 pb-2 hidden">
+            <div class="relative flex items-center">
+              <i data-lucide="search" class="absolute left-3 w-4 h-4 text-slateText stroke-[1.75]"></i>
+              <input type="text" id="feed-search-input" oninput="handleFeedSearch(this.value)" placeholder="Поиск по заведениям и блюдам..." class="w-full h-9 pl-9 pr-8 bg-surface border border-borderLine rounded-full text-xs text-charcoal outline-none focus:border-brand transition" aria-label="Поиск по заведениям">
+              <button onclick="clearFeedSearch()" class="absolute right-2.5 text-slateText hover:text-charcoal p-1" aria-label="Очистить поиск">
+                <i data-lucide="x" class="w-3.5 h-3.5 stroke-[2]"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Чипы категорий: строго Все, Выпечка, Готовая еда, Продукты (Раздел 16) -->
+          <div class="px-5 py-1.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0" id="category-chips-row">
+            <button onclick="selectCategory(this, 'all')" class="cat-chip h-8 px-3.5 bg-brand text-white rounded-[10px] text-xs font-semibold shrink-0 shadow-xs transition" aria-pressed="true">
+              Все
+            </button>
+            <button onclick="selectCategory(this, 'bakery')" class="cat-chip h-8 px-3.5 bg-surface border border-borderLine text-charcoal rounded-[10px] text-xs font-medium shrink-0 hover:bg-surfaceMuted transition" aria-pressed="false">
+              Выпечка
+            </button>
+            <button onclick="selectCategory(this, 'meals')" class="cat-chip h-8 px-3.5 bg-surface border border-borderLine text-charcoal rounded-[10px] text-xs font-medium shrink-0 hover:bg-surfaceMuted transition" aria-pressed="false">
+              Готовая еда
+            </button>
+            <button onclick="selectCategory(this, 'groceries')" class="cat-chip h-8 px-3.5 bg-surface border border-borderLine text-charcoal rounded-[10px] text-xs font-medium shrink-0 hover:bg-surfaceMuted transition" aria-pressed="false">
+              Продукты
+            </button>
+          </div>
+
+          <!-- Лента карточек наборов -->
+          <div id="feed-container" class="flex-1 overflow-y-auto px-5 py-3 space-y-4 no-scrollbar pb-24">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-charcoal">Забрать сегодня</h3>
+              <span id="feed-top-subtext" class="text-xs font-medium text-slateText">Окно до 21:00</span>
+            </div>
+
+            <!-- КАРТОЧКА 1: Paul Bakery (Французская выпечка) -->
+            <div id="feed-card-paul" class="feed-card relative bg-surface rounded-[18px] border border-borderLine overflow-hidden card-shadow transition">
+              <!-- Ссылка на товар (Раздел 16: карточка как ссылка на detail) -->
+              <div onclick="openListingDetail('paul-bakery-demo')" class="cursor-pointer">
+                <!-- Фото 16:10 с фокусом по центру еды -->
+                <div class="relative aspect-[16/10] w-full overflow-hidden bg-amber-900">
+                  <img src="https://images.unsplash.com/photo-1509440159596-0249088772ff?w=700&auto=format&fit=crop&q=80" alt="Свежая выпечка в Paul Bakery" class="w-full h-full object-cover">
+                  <!-- Нейтральный бейдж остатка (нейтральный текст для >1 набора) -->
+                  <span id="paul-feed-badge" class="absolute top-3 left-3 bg-white/95 dark:bg-neutral-900/90 backdrop-blur text-charcoal text-[11px] font-semibold px-2.5 py-1 rounded-[8px] shadow-xs">
+                    Осталось 2 набора
+                  </span>
+                </div>
+
+                <!-- Тело карточки -->
+                <div class="p-4">
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <div class="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center text-xs font-extrabold shrink-0 shadow-xs">
+                      PAUL
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-baseline justify-between">
+                        <h4 class="text-[15px] font-bold text-charcoal truncate">Paul Bakery</h4>
+                        <span class="text-xs font-bold text-charcoal flex items-center gap-1 shrink-0 tabular-nums">
+                          <i data-lucide="star" class="w-3.5 h-3.5 fill-[#FFA800] text-[#FFA800]"></i> 4.8
+                        </span>
+                      </div>
+                      <p class="text-xs text-slateText truncate mt-0.5">Французская пекарня · 650 м</p>
+                    </div>
+                  </div>
+
+                  <p class="text-base font-semibold text-charcoal mt-2.5">Сюрприз-набор свежей выпечки</p>
+                  
+                  <!-- Футер карточки -->
+                  <div class="mt-3 pt-2.5 border-t border-borderLine space-y-1.5">
+                    <div class="flex items-center gap-1.5 text-xs text-slateText font-medium">
+                      <i data-lucide="clock" class="w-3.5 h-3.5 text-slateText stroke-[1.75]"></i>
+                      <span class="tabular-nums whitespace-nowrap">Сегодня 20:30–21:00</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-[11px] font-bold bg-brandSoft text-brand px-2 py-0.5 rounded-[6px] tabular-nums">
+                        −67%
+                      </span>
+                      <div class="flex items-baseline gap-2 whitespace-nowrap">
+                        <span class="text-xs text-slateText line-through tabular-nums">4 500&nbsp;₸</span>
+                        <span class="text-xl font-bold text-brand dark:text-emerald-400 tabular-nums">1 490&nbsp;₸</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Сердечко избранного (Раздел 16: отдельная соседняя кнопка в DOM, 44×44px hit area) -->
+              <button onclick="toggleFav(event, this, 'paul-bakery-demo')" class="btn-fav absolute top-3 right-3 min-w-[44px] min-h-[44px] w-11 h-11 rounded-full bg-white/85 dark:bg-black/60 backdrop-blur flex items-center justify-center text-charcoal shadow-sm active:scale-125 transition-transform duration-150 z-20" aria-label="Добавить Paul Bakery в избранное" aria-pressed="false">
+                <i data-lucide="heart" class="w-4 h-4 stroke-[1.75] stroke-current fill-none"></i>
+              </button>
+            </div>
+
+            <!-- КАРТОЧКА 2: Urban Fork Deli (Срочный остаток 1 набор) -->
+            <div id="feed-card-urban" class="feed-card relative bg-surface rounded-[18px] border border-borderLine overflow-hidden card-shadow transition">
+              <div onclick="openListingDetail('urban-fork-demo')" class="cursor-pointer">
+                <div class="relative aspect-[16/10] w-full overflow-hidden bg-slate-800">
+                  <img src="https://images.unsplash.com/photo-1540420773420-3366772f4999?w=700&auto=format&fit=crop&q=80" alt="Гастрономия Urban Fork" class="w-full h-full object-cover">
+                  <!-- Сдержанное терракотовое выделение для 1 набора -->
+                  <span class="absolute top-3 left-3 bg-urgent text-white text-[11px] font-bold px-2.5 py-1 rounded-[8px] shadow-sm">
+                    Остался 1 набор
+                  </span>
+                </div>
+                <div class="p-4">
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <div class="w-10 h-10 rounded-xl bg-[#141414] dark:bg-surfaceMuted flex items-center justify-center text-white dark:text-charcoal text-xs font-bold shrink-0 shadow-xs">
+                      UFD
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-baseline justify-between">
+                        <h4 class="text-[15px] font-bold text-charcoal truncate">Urban Fork Deli</h4>
+                        <span class="text-xs font-bold text-charcoal flex items-center gap-1 shrink-0 tabular-nums">
+                          <i data-lucide="star" class="w-3.5 h-3.5 fill-[#FFA800] text-[#FFA800]"></i> 4.9
+                        </span>
+                      </div>
+                      <p class="text-xs text-slateText truncate mt-0.5">Кулинария и боулы · 1.2 км</p>
+                    </div>
+                  </div>
+                  <p class="text-base font-semibold text-charcoal mt-2.5">Вечерний гастро-набор</p>
+                  <div class="mt-3 pt-2.5 border-t border-borderLine space-y-1.5">
+                    <div class="flex items-center gap-1.5 text-xs text-slateText font-medium">
+                      <i data-lucide="clock" class="w-3.5 h-3.5 text-slateText stroke-[1.75]"></i>
+                      <span class="tabular-nums whitespace-nowrap">Сегодня 21:00–21:45</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-[11px] font-bold bg-brandSoft text-brand px-2 py-0.5 rounded-[6px] tabular-nums">
+                        −58%
+                      </span>
+                      <div class="flex items-baseline gap-2 whitespace-nowrap">
+                        <span class="text-xs text-slateText line-through tabular-nums">4 400&nbsp;₸</span>
+                        <span class="text-xl font-bold text-brand dark:text-emerald-400 tabular-nums">1 850&nbsp;₸</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button onclick="toggleFav(event, this, 'urban-fork-demo')" class="btn-fav absolute top-3 right-3 min-w-[44px] min-h-[44px] w-11 h-11 rounded-full bg-white/85 dark:bg-black/60 backdrop-blur flex items-center justify-center text-charcoal shadow-sm active:scale-125 transition-transform duration-150 z-20" aria-label="Добавить Urban Fork в избранное" aria-pressed="false">
+                <i data-lucide="heart" class="w-4 h-4 stroke-[1.75] stroke-current fill-none"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Нижний Tab Bar iOS (H: 76px, полупрозрачный блюр) -->
+          <nav class="absolute bottom-0 left-0 right-0 h-[76px] bg-surface/85 backdrop-blur-xl border-t border-borderLine flex items-center justify-around px-2 pb-4 z-20">
+            <button onclick="switchTab('feed')" id="tab-btn-feed" class="flex flex-col items-center gap-0.5 text-brand dark:text-emerald-400 min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="compass" class="w-5 h-5 stroke-[2]"></i>
+              <span class="text-[10px] font-bold">Обзор</span>
+            </button>
+            <button onclick="switchTab('map')" id="tab-btn-map" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="map" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Карта</span>
+            </button>
+            <button onclick="switchTab('favorites')" id="tab-btn-favorites" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="heart" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Избранное</span>
+            </button>
+            <button onclick="switchTab('orders')" id="tab-btn-orders" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal relative transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="shopping-bag" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Заказы</span>
+              <span id="badge-orders" class="hidden absolute top-1 right-2 w-2 h-2 rounded-full bg-urgent"></span>
+            </button>
+            <button onclick="switchTab('profile')" id="tab-btn-profile" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="user" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Профиль</span>
+            </button>
+          </nav>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- ЭКРАН 3: ПУСТОЕ СОСТОЯНИЕ ВНУТРИ КАТАЛОГА (Раздел 17)          -->
+        <!-- ============================================================== -->
+        <section id="screen-empty" class="screen absolute inset-0 flex flex-col bg-bgCanvas transition-colors duration-200 hidden z-10">
+          <!-- Шапка каталога (сохраняет локацию и поиск, Раздел 17) -->
+          <div class="px-5 pt-3 pb-2 flex items-center justify-between gap-2 shrink-0">
+            <button onclick="openDistrictModal()" class="h-9 px-3.5 bg-surface border border-borderLine rounded-full flex items-center gap-1.5 card-shadow active:scale-95 transition min-w-0" title="Изменить район" aria-label="Выбрать район и радиус поиска">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-brand stroke-[2] shrink-0"></i>
+              <span id="empty-location-label" class="text-xs font-semibold text-charcoal whitespace-nowrap truncate">Бостандык · 3 км</span>
+              <i data-lucide="chevron-down" class="w-3 h-3 text-slateText stroke-[2] shrink-0"></i>
+            </button>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button onclick="setScreen('screen-feed')" title="Вернуться к ленте" class="w-9 h-9 flex items-center justify-center text-charcoal hover:text-brand transition" aria-label="Поиск">
+                <i data-lucide="search" class="w-5 h-5 stroke-[1.75]"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Содержимое пустого состояния (Раздел 17: отступ 40-56px, выравнивание влево, без белого квадрата) -->
+          <div class="flex-1 overflow-y-auto px-5 pt-10 pb-24 text-left">
+            <!-- Опциональная SVG-иконка пакета 28–32 px без отдельной поверхности и рамки -->
+            <svg class="w-7 h-7 text-slateText mb-3 stroke-[1.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <path d="M16 10a4 4 0 0 1-8 0"/>
+            </svg>
+
+            <!-- Заголовок и пояснение (Раздел 17) -->
+            <h3 id="empty-state-title" class="text-[23px] font-semibold text-charcoal leading-[1.25]">
+              Рядом пока нет наборов
+            </h3>
+            <p id="empty-state-desc" class="text-[15px] text-slateText mt-2 leading-[22px] max-w-[320px]">
+              Попробуйте увеличить радиус поиска или включите уведомления.
+            </p>
+
+            <!-- Единственное основное действие: Расширить радиус (currentRadius + 5 км) -->
+            <button onclick="expandSearchRadius()" id="btn-expand-radius" class="w-full h-[50px] bg-brand hover:bg-brandHover active:scale-[0.98] text-white font-semibold text-sm rounded-[14px] mt-5 shadow-sm transition flex items-center justify-center gap-2">
+              <i data-lucide="compass" class="w-4 h-4 stroke-[2]"></i>
+              <span id="btn-expand-radius-label">Посмотреть в радиусе 8 км</span>
+            </button>
+
+            <!-- Уведомления: одна обычная строка под действием, с пояснением и switch (Раздел 17) -->
+            <div class="mt-6 pt-5 border-t border-borderLine flex items-center justify-between gap-3">
+              <div>
+                <span class="text-xs font-semibold text-charcoal block">Уведомить о новых наборах</span>
+                <span class="text-[11px] text-slateText">Пришлём пуш, когда появятся вечерние наборы</span>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                <input type="checkbox" id="toggle-notifications-switch" onchange="togglePushNotifications(this)" class="sr-only peer" aria-label="Включить push-уведомления">
+                <div class="w-11 h-6 bg-gray-200 dark:bg-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Нижний Tab Bar -->
+          <nav class="absolute bottom-0 left-0 right-0 h-[76px] bg-surface/85 backdrop-blur-xl border-t border-borderLine flex items-center justify-around px-2 pb-4 z-20">
+            <button onclick="switchTab('feed')" class="flex flex-col items-center gap-0.5 text-brand dark:text-emerald-400 min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="compass" class="w-5 h-5 stroke-[2]"></i>
+              <span class="text-[10px] font-bold">Обзор</span>
+            </button>
+            <button onclick="switchTab('map')" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="map" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Карта</span>
+            </button>
+            <button onclick="switchTab('favorites')" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="heart" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Избранное</span>
+            </button>
+            <button onclick="switchTab('orders')" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal relative transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="shopping-bag" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Заказы</span>
+            </button>
+            <button onclick="switchTab('profile')" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="user" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Профиль</span>
+            </button>
+          </nav>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- ЭКРАН 4: КАРТОЧКА НАБОРА (Разделы 18 и 19)                      -->
+        <!-- ============================================================== -->
+        <section id="screen-detail" class="screen absolute inset-0 flex flex-col bg-bgCanvas transition-colors duration-200 hidden z-10">
+          <div class="flex-1 overflow-y-auto no-scrollbar pb-24">
+            <!-- Hero-фото (~260px, Раздел 18) -->
+            <div class="relative h-[260px] w-full bg-amber-950 overflow-hidden">
+              <img id="detail-image" src="https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80" alt="Сюрприз-набор выпечки" class="w-full h-full object-cover">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20"></div>
+              
+              <!-- 3 компактные кнопки поверх фото (44×44 tap-target, Раздел 18) -->
+              <div class="absolute top-2.5 left-4 right-4 flex items-center justify-between z-10">
+                <button onclick="setScreen('screen-feed')" class="min-w-[44px] min-h-[44px] w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white card-shadow active:scale-95 transition" aria-label="Назад в ленту">
+                  <i data-lucide="arrow-left" class="w-5 h-5 stroke-[2]"></i>
+                </button>
+                <div class="flex gap-2">
+                  <button onclick="handleShareListing()" class="min-w-[44px] min-h-[44px] w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white card-shadow active:scale-95 transition" aria-label="Поделиться набором">
+                    <i data-lucide="share-2" class="w-4 h-4 stroke-[2]"></i>
+                  </button>
+                  <button onclick="toggleFav(event, this, 'paul-bakery-demo')" id="detail-fav-btn" class="btn-fav min-w-[44px] min-h-[44px] w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white card-shadow active:scale-125 transition-transform duration-150" aria-label="Добавить в избранное" aria-pressed="false">
+                    <i data-lucide="heart" class="w-4 h-4 stroke-[2] stroke-current fill-none"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Контентная часть (Раздел 18: чистая иерархия, без избыточных карточек) -->
+            <div class="p-5 space-y-4">
+              <div>
+                <div class="flex items-center gap-2 text-xs font-semibold text-slateText">
+                  <span id="detail-business-name" class="font-bold text-charcoal text-sm">Paul Bakery</span>
+                  <span>·</span>
+                  <span class="text-charcoal font-bold flex items-center gap-0.5 tabular-nums">
+                    <i data-lucide="star" class="w-3.5 h-3.5 fill-[#FFA800] text-[#FFA800]"></i> 4.8 (124)
+                  </span>
+                </div>
+                <h2 id="detail-title" class="text-2xl font-extrabold text-charcoal mt-1 tracking-tight leading-snug">
+                  Сюрприз-набор выпечки
+                </h2>
+                <p id="detail-address-row" class="text-xs text-slateText mt-1 flex items-center gap-1.5 font-medium">
+                  <i data-lucide="map-pin" class="w-3.5 h-3.5 text-brand stroke-[2] shrink-0"></i>
+                  <span>пр. Достык, 42 · 650 м</span>
+                </p>
+                <!-- Короткая строка остатка (Раздел 18: нейтральная при >1) -->
+                <p id="detail-stock-row" class="text-xs text-slateText font-medium mt-1.5">
+                  Осталось 2 набора
+                </p>
+              </div>
+
+              <!-- Окно самовывоза: один аккуратный акцентный блок (Раздел 18) -->
+              <div class="bg-surface border border-borderLine rounded-[14px] p-3.5 flex items-center justify-between">
+                <div>
+                  <span class="text-xs text-slateText font-medium block">Самовывоз</span>
+                  <p id="detail-pickup-window" class="text-base font-bold text-charcoal mt-0.5 tabular-nums">Сегодня, 20:30–21:00</p>
+                  <p class="text-[11px] text-slateText mt-0.5">Заберите набор в это время</p>
+                </div>
+                <div class="w-9 h-9 rounded-xl bg-surfaceMuted flex items-center justify-center text-charcoal shrink-0">
+                  <i data-lucide="clock" class="w-4 h-4 stroke-[1.75]"></i>
+                </div>
+              </div>
+
+              <!-- Раздел: Что может быть внутри (обычный текст на фоне страницы, Раздел 18) -->
+              <div class="space-y-1 pt-1">
+                <h4 class="text-sm font-bold text-charcoal">Что может быть внутри</h4>
+                <p class="text-xs text-slateText leading-[21px]">
+                  Обычно в наборе бывают круассаны, багеты, бриоши или десерты. Состав зависит от остатка дня.
+                </p>
+              </div>
+
+              <!-- Аллергены: компактный список с ясной подписью (Раздел 18) -->
+              <div class="text-xs pt-1">
+                <span class="font-semibold text-charcoal">Аллергены:</span>
+                <span class="text-slateText ml-1">Пшеница, Молоко, Орехи, Яйца</span>
+              </div>
+
+              <!-- Бесплатная отмена: одна строка (Раздел 18) -->
+              <div class="pt-2 border-t border-borderLine flex items-center justify-between text-xs">
+                <span class="text-slateText">Условия отмены:</span>
+                <span id="detail-cancellation-text" class="font-bold text-charcoal tabular-nums">Бесплатная отмена до 19:30</span>
+              </div>
+
+              <!-- Адрес и маршрут (Раздел 18) -->
+              <div class="pt-2 border-t border-borderLine flex items-center justify-between">
+                <div>
+                  <p class="text-xs font-bold text-charcoal">пр. Достык, 42</p>
+                  <p class="text-[11px] text-slateText">Paul Bakery · 650 м</p>
+                </div>
+                <a href="https://2gis.kz" target="_blank" class="h-9 px-3.5 bg-surface border border-borderLine hover:bg-surfaceMuted text-charcoal font-semibold text-xs rounded-xl flex items-center gap-1.5 transition">
+                  <i data-lucide="navigation" class="w-3.5 h-3.5 stroke-[2] text-brand"></i>
+                  <span>Маршрут в 2GIS</span>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Нижняя панель бронирования (Раздел 19: PricePanel) -->
+          <footer id="detail-footer-panel" class="absolute bottom-0 left-0 right-0 h-[84px] bg-surface border-t border-borderLine px-5 flex items-center justify-between pb-3 z-20 sheet-shadow">
+            <!-- Нормальное состояние цены (Раздел 19) -->
+            <div id="detail-price-box" class="numeric">
+              <div class="flex items-baseline gap-2 whitespace-nowrap">
+                <del class="text-xs text-slateText tabular-nums whitespace-nowrap">4 500 ₸</del>
+                <strong class="text-2xl font-extrabold text-charcoal tabular-nums whitespace-nowrap leading-none">1 490 ₸</strong>
+              </div>
+              <div class="text-[11px] text-slateText mt-0.5 whitespace-nowrap">+ 90 ₸ сервисный сбор</div>
+            </div>
+            <button onclick="handleBookingStart()" id="btn-book-action" class="min-h-[50px] px-7 bg-brand hover:bg-brandHover active:scale-95 text-white font-bold text-sm rounded-[14px] shadow-md flex items-center gap-2 transition">
+              <span>Забронировать</span>
+            </button>
+          </footer>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- ЭКРАН 5: ОФОРМЛЕНИЕ ЗАКАЗА (Разделы 20, 21, 22)                -->
+        <!-- ============================================================== -->
+        <section id="screen-checkout" class="screen absolute inset-0 flex flex-col bg-bgCanvas transition-colors duration-200 hidden z-10">
+          <!-- Шапка: Оформление заказа, назад и помощь (Раздел 20) -->
+          <div class="px-4 py-3 flex items-center justify-between border-b border-borderLine bg-surface/90 backdrop-blur-md shrink-0 sticky top-0 z-20">
+            <button onclick="setScreen('screen-detail')" class="w-9 h-9 flex items-center justify-center text-charcoal hover:text-brand active:scale-95 transition" aria-label="Назад к товару">
+              <i data-lucide="chevron-left" class="w-5 h-5 stroke-[2]"></i>
+            </button>
+            <div class="text-center">
+              <h2 class="text-sm font-bold text-charcoal tracking-tight">Оформление заказа</h2>
+              <p class="text-[10px] text-slateText font-medium">Paul Bakery • пр. Достык, 42</p>
+            </div>
+            <button onclick="alert('Поддержка CrumbSave: support@crumbsave.kz\nТел: +7 (727) 355-80-80')" class="w-9 h-9 flex items-center justify-center text-slateText hover:text-brand transition" aria-label="Служба поддержки">
+              <i data-lucide="help-circle" class="w-5 h-5 stroke-[2]"></i>
+            </button>
+          </div>
+
+          <!-- Бронь: компактная строка «Бронь за вами · 04:42» (Раздел 20) -->
+          <div id="checkout-timer-banner" class="bg-amber-500/10 dark:bg-amber-950/30 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-900 dark:text-amber-300 shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-amber-600 animate-ping"></span>
+              <span class="font-medium text-[11px]">Бронь за вами</span>
+            </div>
+            <div class="flex items-center gap-1 font-bold tabular-nums text-amber-800 dark:text-amber-300 text-xs">
+              <i data-lucide="clock" class="w-3 h-3 stroke-[2.5]"></i>
+              <span id="checkout-timer">04:42</span>
+            </div>
+          </div>
+
+          <!-- Контент чека и оплаты -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-3.5 no-scrollbar">
+            <!-- Короткая сводка заказа (фото 64px, Раздел 20) -->
+            <div class="bg-surface border border-borderLine rounded-2xl p-3.5 card-shadow flex items-center gap-3">
+              <div class="w-16 h-16 rounded-xl bg-amber-900 overflow-hidden shrink-0 border border-borderLine">
+                <img src="https://images.unsplash.com/photo-1509440159596-0249088772ff?w=160" class="w-full h-full object-cover" alt="Сюрприз-набор">
+              </div>
+              <div class="flex-1 min-w-0">
+                <h5 class="text-xs font-bold text-charcoal leading-snug">Сюрприз-набор выпечки</h5>
+                <p class="text-[11px] text-slateText mt-0.5">1 шт. · Paul Bakery</p>
+                <p class="text-[10px] text-slateText mt-0.5">Самовывоз сегодня: 20:30–21:00</p>
+              </div>
+            </div>
+
+            <!-- Список способов оплаты в едином блоке (Раздел 20) -->
+            <div class="bg-surface border border-borderLine rounded-2xl overflow-hidden card-shadow">
+              <div class="p-3 bg-surfaceMuted/50 border-b border-borderLine flex items-center justify-between">
+                <span class="text-[11px] font-bold text-slateText uppercase tracking-wider">Способ оплаты</span>
+                <span class="text-[10px] text-brand dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  <i data-lucide="shield-check" class="w-3 h-3"></i> 0% комиссия
+                </span>
+              </div>
+
+              <div class="divide-y divide-borderLine">
+                <!-- Вариант 1: Kaspi Pay -->
+                <label onclick="selectPayment('kaspi')" id="opt-kaspi" class="payment-option h-[64px] flex items-center justify-between px-3.5 cursor-pointer bg-red-50/40 dark:bg-red-950/20 transition">
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <div class="radio-indicator w-4 h-4 rounded-full border-2 border-kaspiRed flex items-center justify-center shrink-0">
+                      <div class="w-2 h-2 rounded-full bg-kaspiRed"></div>
+                    </div>
+                    <div class="flex items-center gap-2.5 flex-1 min-w-0">
+                      <div class="w-7 h-7 rounded-xl bg-red-100 dark:bg-red-950/50 flex items-center justify-center shrink-0">
+                        <img src="assets/kaspi_icon.svg" onerror="this.src=EMBEDDED_PAYMENT_ASSETS.kaspiIcon" class="w-4 h-4 rounded-full object-contain shrink-0" style="width: 16px; height: 16px; min-width: 16px; min-height: 16px;" alt="Kaspi">
+                      </div>
+                      <div>
+                        <span class="text-xs font-bold text-charcoal">Kaspi Pay</span>
+                        <p class="text-[10px] text-slateText">Оплата через приложение Kaspi.kz</p>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <!-- Вариант 2: Apple Pay -->
+                <label onclick="selectPayment('apple')" id="opt-apple" class="payment-option h-[64px] flex items-center justify-between px-3.5 cursor-pointer hover:bg-surfaceMuted transition">
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <div class="radio-indicator w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600 shrink-0"></div>
+                    <div class="flex items-center gap-2.5 flex-1 min-w-0">
+                      <div class="w-7 h-7 rounded-xl bg-gray-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">
+                        <img src="assets/apple_pay.svg" onerror="this.src=EMBEDDED_PAYMENT_ASSETS.applePayDark" class="h-3.5 w-auto object-contain dark:invert shrink-0" style="height: 14px; width: auto;" alt="Apple Pay">
+                      </div>
+                      <div>
+                        <span class="text-xs font-bold text-charcoal">Apple Pay</span>
+                        <p class="text-[10px] text-slateText">Face ID / Touch ID</p>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <!-- Вариант 3: Банковская карта -->
+                <label onclick="selectPayment('card')" id="opt-card" class="payment-option h-[64px] flex items-center justify-between px-3.5 cursor-pointer hover:bg-surfaceMuted transition">
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <div class="radio-indicator w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600 shrink-0"></div>
+                    <div class="flex items-center gap-2.5 flex-1 min-w-0">
+                      <div class="w-7 h-7 rounded-xl bg-gray-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">
+                        <img src="assets/mastercard.svg" class="h-3.5 w-auto object-contain shrink-0" style="height: 14px; width: auto;" alt="Mastercard">
+                      </div>
+                      <div>
+                        <span class="text-xs font-bold text-charcoal">Mastercard •••• 4812</span>
+                        <p class="text-[10px] text-slateText">Halyk Bank · Дебетовая</p>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Детализация чека (Раздел 20) -->
+            <div class="bg-surface border border-borderLine rounded-2xl p-4 space-y-2 text-xs card-shadow">
+              <div class="flex justify-between text-slateText">
+                <span>Стоимость набора (1 шт.)</span>
+                <span class="tabular-nums font-semibold whitespace-nowrap">1 490&nbsp;₸</span>
+              </div>
+              <div class="flex justify-between text-slateText items-center">
+                <span>Сервисный сбор</span>
+                <span class="tabular-nums font-semibold whitespace-nowrap">90&nbsp;₸</span>
+              </div>
+              <div class="pt-2 border-t border-borderLine flex justify-between font-bold text-sm text-charcoal items-baseline">
+                <span>Итого к оплате</span>
+                <span id="checkout-total-price" class="text-brand dark:text-emerald-400 text-xl font-extrabold tabular-nums whitespace-nowrap">1 580&nbsp;₸</span>
+              </div>
+              <!-- Справочная строка экономии (Раздел 20) -->
+              <div class="pt-1.5 border-t border-borderLine/50 flex justify-between text-[11px] text-brand dark:text-emerald-400 font-medium">
+                <span>Экономия на наборе</span>
+                <span class="tabular-nums font-bold whitespace-nowrap">3 010&nbsp;₸</span>
+              </div>
+            </div>
+
+            <!-- Ошибка оплаты (скрыта по умолчанию, Разделы 22 и 30) -->
+            <div id="checkout-error-msg" class="hidden bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-xl p-3 flex items-start gap-2.5 text-xs text-red-800 dark:text-red-300">
+              <i data-lucide="alert-circle" class="w-4 h-4 text-red-600 shrink-0 mt-0.5"></i>
+              <span>Оплата не прошла. Попробуйте ещё раз или выберите другой способ</span>
+            </div>
+          </div>
+
+          <!-- Нижняя панель оплаты (Раздел 20) -->
+          <div class="shrink-0 bg-surface/95 backdrop-blur-xl border-t border-borderLine p-4 pb-4 z-20 sheet-shadow">
+            <button id="btn-pay-action" onclick="handlePaymentSubmit()" class="w-full min-h-[50px] bg-kaspiRed hover:bg-red-700 active:scale-[0.98] text-white font-bold text-sm rounded-[14px] shadow-lg flex items-center justify-between px-5 transition">
+              <div class="flex items-center gap-2.5 flex-1 min-w-0">
+                <img src="assets/kaspi_icon_white_badge.svg" onerror="this.src=EMBEDDED_PAYMENT_ASSETS.kaspiIconWhite" class="w-4 h-4 rounded-full object-contain shrink-0" style="width: 16px; height: 16px; min-width: 16px; min-height: 16px;" alt="Kaspi">
+                <span id="btn-pay-title">Оплатить в Kaspi · 1 580 ₸</span>
+              </div>
+              <i data-lucide="arrow-right" class="w-4 h-4 shrink-0"></i>
+            </button>
+            <p class="text-[10px] text-slateText text-center mt-2">Нажимая «Оплатить», вы соглашаетесь с условиями оферты</p>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- ЭКРАН 6: ВЫДАЧА И БИЛЕТ (Раздел 23)                            -->
+        <!-- ============================================================== -->
+        <section id="screen-ticket" class="screen absolute inset-0 flex flex-col bg-bgCanvas transition-colors duration-200 hidden z-10">
+          <!-- Шапка билета -->
+          <div class="px-5 py-2.5 flex items-center justify-between border-b border-borderLine bg-bgCanvas shrink-0">
+            <button onclick="setScreen('screen-feed')" class="w-9 h-9 flex items-center justify-center text-charcoal hover:text-brand transition" aria-label="Закрыть билет и вернуться в каталог">
+              <i data-lucide="x" class="w-5 h-5 stroke-[1.75]"></i>
+            </button>
+            <span class="text-xs font-bold text-slateText tabular-nums tracking-wide">ЗАКАЗ #CS-8492</span>
+            <button onclick="alert('Поддержка по заказу #CS-8492:\nТелефон пекарни: +7 (727) 348-00-00\nАдрес: пр. Достык, 42')" class="text-xs font-bold text-brand dark:text-emerald-400 hover:underline">Помощь</button>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-5 flex flex-col items-center text-center no-scrollbar pb-8">
+            <!-- Степпер этапов заказа: Оплачено -> К выдаче -> Получено (Раздел 23) -->
+            <div class="w-full bg-surface border border-borderLine rounded-2xl p-3 card-shadow mb-3">
+              <div class="flex items-center justify-between px-2">
+                <div class="flex items-center gap-1.5" id="step-paid">
+                  <div class="w-5 h-5 rounded-full bg-brand text-white flex items-center justify-center text-[10px] font-bold" id="step-paid-circle">
+                    <i data-lucide="check" class="w-3 h-3 stroke-[3]"></i>
+                  </div>
+                  <span class="text-[11px] font-semibold text-charcoal">Оплачено</span>
+                </div>
+                <div class="w-5 h-px bg-brand" id="step-line-1"></div>
+                <div class="flex items-center gap-1.5" id="step-ready">
+                  <div class="w-5 h-5 rounded-full bg-brand text-white flex items-center justify-center text-[10px] font-bold" id="step-ready-circle">
+                    <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+                  </div>
+                  <span class="text-[11px] font-bold text-brand dark:text-emerald-400" id="step-ready-text">К выдаче</span>
+                </div>
+                <div class="w-5 h-px bg-borderLine" id="step-line-2"></div>
+                <div class="flex items-center gap-1.5" id="step-done">
+                  <div class="w-5 h-5 rounded-full bg-surfaceMuted border border-borderLine text-slateText flex items-center justify-center text-[10px] font-bold" id="step-done-circle">
+                    3
+                  </div>
+                  <span class="text-[11px] font-medium text-slateText" id="step-done-text">Получено</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Карточка билета с боковыми вырезами (Раздел 23) -->
+            <div class="ticket-card w-full bg-surface border border-borderLine rounded-3xl p-5 card-shadow space-y-3.5 relative">
+              <div class="ticket-notch-left"></div>
+              <div class="ticket-notch-right"></div>
+
+              <!-- Статус билета (динамически меняется по часам: «Выдача сегодня с 20:30» или «Можно забрать») -->
+              <span id="ticket-status-pill" class="inline-flex items-center gap-1.5 bg-brandSoft text-brand px-3 py-1 rounded-full text-xs font-bold">
+                <span class="w-2 h-2 rounded-full bg-brand animate-ping"></span>
+                <span id="ticket-status-text">Выдача сегодня с 20:30</span>
+              </span>
+
+              <div>
+                <h3 class="text-xl font-bold text-charcoal">Paul Bakery</h3>
+                <p class="text-xs text-slateText mt-0.5">пр. Достык, 42 · г. Алматы</p>
+              </div>
+
+              <!-- Компактный блок времени самовывоза -->
+              <div id="ticket-timer-box" class="bg-surfaceMuted border border-borderLine rounded-xl py-2 px-3 flex items-center justify-between text-xs">
+                <span id="ticket-timer-label" class="text-slateText font-medium">Окно: 20:30–21:00</span>
+                <span id="ticket-timer-val" class="font-bold text-charcoal tabular-nums">Сегодня</span>
+              </div>
+
+              <!-- Линия перфорации -->
+              <div class="border-t-2 border-dashed border-borderLine my-1"></div>
+
+              <!-- РЕАЛЬНЫЙ ЧИТАЕМЫЙ QR-КОД (Чёрный на белом, 200px) -->
+              <div class="py-1 flex flex-col items-center">
+                <div onclick="cashierConfirmPickup()" title="Кликните для симуляции сканирования кассиром" class="p-3 bg-white border border-gray-200 rounded-2xl shadow-sm flex items-center justify-center cursor-pointer active:scale-95 transition">
+                  <div id="qrcode" class="w-[200px] h-[200px] flex items-center justify-center"></div>
+                </div>
+              </div>
+
+              <!-- Резервный ПИН-код сотрудника (Раздел 23) -->
+              <div class="bg-bgCanvas border border-borderLine rounded-xl py-2 px-4 inline-block">
+                <span class="text-[10px] font-semibold text-slateText block uppercase tracking-wider">Код для сотрудника:</span>
+                <span class="text-xl font-bold text-brand dark:text-emerald-400 tabular-nums tracking-[4px]">4 8 9 2</span>
+              </div>
+
+              <p class="text-xs text-slateText pt-1 max-w-[280px] leading-relaxed">
+                Покажите QR-код сотруднику. Если не получится сканировать, назовите код
+              </p>
+            </div>
+
+            <!-- Кнопки действий -->
+            <div class="mt-4 w-full space-y-2">
+              <a href="https://2gis.kz" target="_blank" class="w-full min-h-[44px] bg-surface border border-borderLine text-charcoal font-bold text-xs rounded-2xl shadow-sm flex items-center justify-center gap-2 hover:bg-surfaceMuted transition">
+                <i data-lucide="navigation" class="w-4 h-4 stroke-[2]"></i>
+                <span>Маршрут в 2GIS</span>
+              </a>
+              <button onclick="handleAddToWallet()" class="w-full min-h-[44px] bg-black text-white font-bold text-xs rounded-2xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition">
+                <i data-lucide="wallet" class="w-4 h-4 stroke-[2]"></i>
+                <span>Добавить в Apple Wallet</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- ЭКРАН 7: ШТОРКА ОТЗЫВА (Раздел 24: Bottom Sheet поверх билета)  -->
+        <!-- ============================================================== -->
+        <section id="screen-rate" class="screen absolute inset-0 flex flex-col justify-end backdrop-blur-md bg-black/40 transition-all duration-300 hidden z-30">
+          <div class="w-full bg-surface rounded-t-[28px] p-5 pb-8 space-y-3.5 text-center sheet-shadow relative max-h-[90%] overflow-y-auto">
+            <!-- ОДНО действие «Пропустить» в правом верхнем углу (Раздел 24) -->
+            <button onclick="closeReviewSheet()" class="absolute top-4 right-4 min-w-[44px] min-h-[44px] flex items-center justify-center text-xs font-semibold text-slateText hover:text-charcoal p-1 transition" aria-label="Пропустить отзыв">
+              Пропустить
+            </button>
+
+            <!-- Ручка для свайпа -->
+            <div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto"></div>
+            
+            <!-- Статус «Заказ получен» с галочкой (Раздел 24) -->
+            <div class="w-10 h-10 rounded-full bg-brandSoft text-brand flex items-center justify-center mx-auto text-xl font-bold shadow-xs">
+              <i data-lucide="check" class="w-5 h-5 stroke-[2.5]"></i>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-bold text-charcoal">Заказ получен</h3>
+              <p class="text-xs text-slateText mt-0.5">Как прошла выдача в Paul Bakery?</p>
+            </div>
+
+            <!-- 5 интерактивных звезд (Раздел 24: hit area >= 44x44px) -->
+            <div class="py-1">
+              <div class="flex items-center justify-center gap-1.5 text-slateText" id="star-rating-box">
+                <button onclick="setStars(1)" class="star-btn min-w-[44px] min-h-[44px] flex items-center justify-center active:scale-125 transition-transform" aria-label="Оценка 1 из 5"><i data-lucide="star" class="w-7 h-7 stroke-[1.5] stroke-current fill-none"></i></button>
+                <button onclick="setStars(2)" class="star-btn min-w-[44px] min-h-[44px] flex items-center justify-center active:scale-125 transition-transform" aria-label="Оценка 2 из 5"><i data-lucide="star" class="w-7 h-7 stroke-[1.5] stroke-current fill-none"></i></button>
+                <button onclick="setStars(3)" class="star-btn min-w-[44px] min-h-[44px] flex items-center justify-center active:scale-125 transition-transform" aria-label="Оценка 3 из 5"><i data-lucide="star" class="w-7 h-7 stroke-[1.5] stroke-current fill-none"></i></button>
+                <button onclick="setStars(4)" class="star-btn min-w-[44px] min-h-[44px] flex items-center justify-center active:scale-125 transition-transform" aria-label="Оценка 4 из 5"><i data-lucide="star" class="w-7 h-7 stroke-[1.5] stroke-current fill-none"></i></button>
+                <button onclick="setStars(5)" class="star-btn min-w-[44px] min-h-[44px] flex items-center justify-center active:scale-125 transition-transform" aria-label="Оценка 5 из 5"><i data-lucide="star" class="w-7 h-7 stroke-[1.5] stroke-current fill-none"></i></button>
+              </div>
+              <p id="star-rating-label" class="text-xs font-semibold text-slateText mt-1 h-4 transition-colors">Нажмите на звёзды для оценки</p>
+            </div>
+
+            <!-- Чипсы-теги (позитивные при 4-5, критические при 1-3) -->
+            <div id="review-tags-container" class="flex flex-wrap gap-1.5 justify-center min-h-[32px]">
+              <button onclick="toggleTag(this)" class="tag-chip h-8 px-3 bg-surface border border-borderLine text-charcoal rounded-[10px] text-xs font-medium hover:bg-surfaceMuted transition" aria-pressed="false">
+                Свежая выпечка
+              </button>
+              <button onclick="toggleTag(this)" class="tag-chip h-8 px-3 bg-surface border border-borderLine text-charcoal rounded-[10px] text-xs font-medium hover:bg-surfaceMuted transition" aria-pressed="false">
+                Быстрая выдача
+              </button>
+              <button onclick="toggleTag(this)" class="tag-chip h-8 px-3 bg-surface border border-borderLine text-charcoal rounded-[10px] text-xs font-medium hover:bg-surfaceMuted transition" aria-pressed="false">
+                Вежливый персонал
+              </button>
+              <button onclick="toggleTag(this)" class="tag-chip h-8 px-3 bg-surface border border-borderLine text-charcoal rounded-[10px] text-xs font-medium hover:bg-surfaceMuted transition" aria-pressed="false">
+                Удобная упаковка
+              </button>
+            </div>
+
+            <!-- Текстовый комментарий со счетчиком 300 символов -->
+            <div class="relative text-left">
+              <textarea id="review-comment" maxlength="300" oninput="handleReviewInput(this)" placeholder="Расскажите подробнее (необязательно)" class="w-full h-16 p-3 bg-bgCanvas border border-borderLine focus:border-brand focus:ring-2 focus:ring-brand/15 focus:bg-surface rounded-2xl text-xs outline-none transition resize-none text-charcoal" aria-label="Текст отзыва"></textarea>
+              <div class="flex justify-end mt-0.5 px-1">
+                <span id="review-counter" class="text-[10px] text-slateText tabular-nums">0 / 300</span>
+              </div>
+            </div>
+
+            <!-- Кнопка отправки (активна только после выбора звезд) -->
+            <div class="pt-0.5">
+              <button id="btn-submit-review" disabled onclick="submitReview()" class="w-full min-h-[48px] bg-borderLine text-slateText font-bold text-xs rounded-2xl cursor-not-allowed transition">
+                Отправить отзыв
+              </button>
+            </div>
+
+            <!-- Второстепенная строка экономии под формой (Раздел 24) -->
+            <div class="pt-2 border-t border-borderLine text-center">
+              <p class="text-[11px] text-slateText font-medium tabular-nums">
+                Экономия на наборе 3 010 ₸ · Предотвращено ~2,5 кг выбросов CO₂
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- ЭКРАН 8: ПРОФИЛЬ И НАСТРОЙКИ (Разделы 04 и 25)                  -->
+        <!-- ============================================================== -->
+        <section id="screen-profile" class="screen absolute inset-0 flex flex-col bg-bgCanvas transition-colors duration-200 hidden z-10">
+          <!-- Шапка профиля -->
+          <div class="px-5 pt-4 pb-3 flex items-center justify-between border-b border-borderLine bg-surface/90 backdrop-blur-md shrink-0">
+            <h2 class="text-base font-bold text-charcoal">Профиль и настройки</h2>
+          </div>
+
+          <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4 no-scrollbar pb-24">
+            <!-- Блок пользователя -->
+            <div class="p-4 bg-surface border border-borderLine rounded-2xl flex items-center gap-3 card-shadow">
+              <div class="w-12 h-12 rounded-full bg-brandSoft text-brand flex items-center justify-center font-bold text-base shrink-0">
+                CS
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-bold text-charcoal truncate">Покупатель CrumbSave</h3>
+                <p class="text-xs text-slateText truncate">Алматы · Спасено 4 набора</p>
+              </div>
+            </div>
+
+            <!-- Настройки интерфейса (Разделы 04, 25, 28) -->
+            <div class="bg-surface border border-borderLine rounded-2xl overflow-hidden card-shadow divide-y divide-borderLine">
+              <!-- Тёмная тема -->
+              <div class="p-3.5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-surfaceMuted flex items-center justify-center text-charcoal">
+                    <i data-lucide="moon" class="w-4 h-4 stroke-[1.75]"></i>
+                  </div>
+                  <div>
+                    <span class="text-xs font-semibold text-charcoal block">Тёмная тема</span>
+                    <span class="text-[10px] text-slateText">Переключить оформление</span>
+                  </div>
+                </div>
+                <button id="btn-theme" onclick="toggleTheme()" class="h-8 px-3 rounded-lg bg-surfaceMuted hover:bg-borderLine text-xs font-semibold text-charcoal flex items-center gap-1.5 transition" aria-label="Переключить тему">
+                  <i data-lucide="moon" class="w-3.5 h-3.5"></i>
+                  <span>Тёмная</span>
+                </button>
+              </div>
+
+              <!-- Push-уведомления -->
+              <div class="p-3.5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-surfaceMuted flex items-center justify-center text-charcoal">
+                    <i data-lucide="bell" class="w-4 h-4 stroke-[1.75]"></i>
+                  </div>
+                  <div>
+                    <span class="text-xs font-semibold text-charcoal block">Уведомления о наборах</span>
+                    <span class="text-[10px] text-slateText">Пуш при появлении новых наборов</span>
+                  </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" onchange="togglePushNotifications(this)" class="sr-only peer" aria-label="Включить push-уведомления">
+                  <div class="w-11 h-6 bg-gray-200 dark:bg-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"></div>
+                </label>
+              </div>
+
+              <!-- Демо-часы тестирования -->
+              <div class="p-3.5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-surfaceMuted flex items-center justify-center text-charcoal">
+                    <i data-lucide="clock" class="w-4 h-4 stroke-[1.75]"></i>
+                  </div>
+                  <div>
+                    <span class="text-xs font-semibold text-charcoal block">Время для тестов</span>
+                    <span class="text-[10px] text-slateText">17:00 или 20:35</span>
+                  </div>
+                </div>
+                <button id="btn-demo-clock" onclick="toggleDemoClock()" class="h-8 px-3 rounded-lg bg-surfaceMuted hover:bg-borderLine text-xs font-semibold text-charcoal flex items-center gap-1.5 transition">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                  <span id="demo-clock-label">Время: 17:00</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Информация о сервисе -->
+            <div class="bg-surface border border-borderLine rounded-2xl p-4 card-shadow space-y-2.5 text-xs">
+              <div class="flex justify-between text-slateText">
+                <span>Город</span>
+                <span class="font-semibold text-charcoal">Алматы</span>
+              </div>
+              <div class="flex justify-between text-slateText">
+                <span>Язык</span>
+                <span class="font-semibold text-charcoal">Русский</span>
+              </div>
+              <div class="flex justify-between text-slateText">
+                <span>Версия</span>
+                <span class="font-semibold text-charcoal tabular-nums">2.4.0</span>
+              </div>
+              <div class="pt-2 border-t border-borderLine text-[11px] text-slateText leading-relaxed">
+                CrumbSave — сервис спасения вечерней еды со скидкой до 70% в заведениях Алматы.
+              </div>
+            </div>
+          </div>
+
+          <!-- Нижний Tab Bar -->
+          <nav class="absolute bottom-0 left-0 right-0 h-[76px] bg-surface/85 backdrop-blur-xl border-t border-borderLine flex items-center justify-around px-2 pb-4 z-20">
+            <button onclick="switchTab('feed')" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="compass" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Обзор</span>
+            </button>
+            <button onclick="switchTab('map')" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="map" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Карта</span>
+            </button>
+            <button onclick="switchTab('favorites')" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="heart" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Избранное</span>
+            </button>
+            <button onclick="switchTab('orders')" class="flex flex-col items-center gap-0.5 text-slateText hover:text-charcoal relative transition min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="shopping-bag" class="w-5 h-5 stroke-[1.75]"></i>
+              <span class="text-[10px] font-medium">Заказы</span>
+            </button>
+            <button onclick="switchTab('profile')" class="flex flex-col items-center gap-0.5 text-brand dark:text-emerald-400 min-h-[44px] min-w-[44px] justify-center">
+              <i data-lucide="user" class="w-5 h-5 stroke-[2]"></i>
+              <span class="text-[10px] font-bold">Профиль</span>
+            </button>
+          </nav>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- ШТОРКА ВЫБОРА РАЙОНА (Раздел 15)                               -->
+        <!-- ============================================================== -->
+        <div id="district-modal" class="absolute inset-0 z-40 bg-black/40 backdrop-blur-xs flex flex-col justify-end hidden transition-all duration-200">
+          <div class="bg-surface rounded-t-[28px] p-5 pb-8 space-y-4 sheet-shadow max-h-[85%] overflow-y-auto">
+            <div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto"></div>
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-bold text-charcoal">Выберите район</h3>
+              <button onclick="closeDistrictModal()" class="w-8 h-8 flex items-center justify-center text-slateText hover:text-charcoal transition" aria-label="Закрыть выбор района">
+                <i data-lucide="x" class="w-5 h-5 stroke-[1.75]"></i>
+              </button>
+            </div>
+            
+            <!-- Опция: Моё местоположение -->
+            <button onclick="selectDistrict('Моё местоположение', 1.5)" class="w-full p-3 bg-brandSoft/80 dark:bg-emerald-950/30 rounded-2xl flex items-center justify-between text-left hover:bg-brandSoft transition">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-brand text-white flex items-center justify-center">
+                  <i data-lucide="navigation" class="w-4 h-4 stroke-[2]"></i>
+                </div>
+                <div>
+                  <span class="text-xs font-bold text-brand dark:text-emerald-400">Моё местоположение</span>
+                  <p class="text-[11px] text-slateText">Определить по GPS</p>
+                </div>
+              </div>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-brand stroke-[2]"></i>
+            </button>
+
+            <!-- Список районов Алматы -->
+            <div class="space-y-1.5 pt-1">
+              <button onclick="selectDistrict('Бостандык', 3)" class="district-opt w-full p-3 bg-bgCanvas hover:bg-surfaceMuted rounded-2xl flex items-center justify-between text-left transition border border-borderLine">
+                <div>
+                  <span class="text-xs font-bold text-charcoal">Бостандыкский</span>
+                  <p class="text-[11px] text-slateText">12 заведений · центр и юг</p>
+                </div>
+                <span class="text-xs font-semibold text-slateText tabular-nums">~3 км</span>
+              </button>
+              <button onclick="selectDistrict('Медеу', 2)" class="district-opt w-full p-3 bg-bgCanvas hover:bg-surfaceMuted rounded-2xl flex items-center justify-between text-left transition border border-borderLine">
+                <div>
+                  <span class="text-xs font-bold text-charcoal">Медеуский</span>
+                  <p class="text-[11px] text-slateText">8 заведений · восток и верх</p>
+                </div>
+                <span class="text-xs font-semibold text-slateText tabular-nums">~2 км</span>
+              </button>
+              <button onclick="selectDistrict('Алмалы', 1.5)" class="district-opt w-full p-3 bg-bgCanvas hover:bg-surfaceMuted rounded-2xl flex items-center justify-between text-left transition border border-borderLine">
+                <div>
+                  <span class="text-xs font-bold text-charcoal">Алмалинский</span>
+                  <p class="text-[11px] text-slateText">15 заведений · исторический центр</p>
+                </div>
+                <span class="text-xs font-semibold text-slateText tabular-nums">~1.5 км</span>
+              </button>
+              <button onclick="selectDistrict('Ауэзов', 5)" class="district-opt w-full p-3 bg-bgCanvas hover:bg-surfaceMuted rounded-2xl flex items-center justify-between text-left transition border border-borderLine">
+                <div>
+                  <span class="text-xs font-bold text-charcoal">Ауэзовский</span>
+                  <p class="text-[11px] text-slateText">6 заведений · запад</p>
+                </div>
+                <span class="text-xs font-semibold text-slateText tabular-nums">~5 км</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+    </div>
+  </main>
+
+  <!-- ==================================================================== -->
+  <!-- СЦЕНАРИИ, СЕРВИСЫ, МОДЕЛЬ И ОБРАБОТЧИКИ (JavaScript)                  -->
+  <!-- ==================================================================== -->
+  <script>
+    // Встроенные SVG-ассеты логотипов платежных систем
+    const EMBEDDED_PAYMENT_ASSETS = {
+      "kaspiIcon": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjE2OC43NSAxNjguNzUgNjYyLjUgNjYyLjUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik01MDAuMDE2IDE2OC43NUM2ODIuNDk0IDE2OC43NSA4MzAuNDg4IDMxNC45MiA4MzEuMjUgNDk1LjUzNlY0OTguMzc2QzgzMC45MTkgNTc4LjY3OCA4MDEuMzY5IDY1Mi4xNDQgNzUyLjY4MSA3MDkuMDEzQzc1MC45MTMgNzA4LjEyNSA3NDcuNjk0IDcwNS4yMjUgNzQxLjg1NiA2OTYuNDk0QzczNS44MTkgNjg3LjcxOSA2ODMuNzM3IDYwNy41NjYgNjgzLjczNyA1MTUuNzAxQzY4My43MzcgNDk3LjY3MyA3MDkuNzI1IDQ2OS41MDkgNzMyLjcxOSA0NDQuNzg4TDczMy4yMTMgNDQ0LjI1N0M3NTAuMjE5IDQyNS44NTQgNzY2LjI1IDQwOC41MDkgNzcyLjE4OCAzOTQuODUxQzc3OS44MjUgMzc3LjA1NiA3NzQuNDgxIDM2NC42MzEgNzY2LjAzMSAzNjAuNDE5Qzc1OC4zODEgMzU2LjY3NiA3NDYuODk0IDM1OS40MDYgNzM4LjgzNyAzNzMuNzIxQzcyNS42MTIgMzk2Ljg4NyA3MjEuMzc1IDQwMS4yMTYgNzAyLjA4MSA0MTYuNzE3QzY4My4xIDQzMi4yMTEgNjUyLjkxOSA0NDcuODA2IDY1Mi45MTkgNDI3LjYxOEM2NTIuOTE5IDQyMC4yNTYgNjYwLjU4OCA0MDYuNjA5IDY2OC4xMTkgMzkzLjE5M0w2NjguMTI1IDM5My4xOTJDNjcxLjc0NCAzODYuNzQxIDY3NS4zMzggMzgwLjM0NCA2NzguMDMxIDM3NC43MjZDNjg2LjUxMyAzNTcuMjI5IDY3Ny4zNzUgMzQ0LjU2MyA2NTkuODYzIDM0NC41NjNDNjI1LjQ3NSAzNDQuNTYzIDYwMi42NTMgMzg4LjM2NyA2MDIuNjUzIDQwMy41NDFDNjAyLjY1MyA0MTAuODM0IDYwNC4zNTQgNDE1LjExOSA2MDYuMTIxIDQxOS41NjdDNjA4LjAyNyA0MjQuMzY3IDYxMC4wMDggNDI5LjM1NyA2MTAuMDA4IDQzOC41MjJDNjEwLjAwOCA0NTYuMzE0IDU3Mi4yOCA0NzkuMzkgNTM2Ljc0MSA0NzkuMzlDNTAwLjk3MSA0NzkuMzkgNDgwLjkwOSA0NzEuODIxIDQ3My40MTQgNDUwLjIxNEw0NzEuMDM3IDQ0My4xODNMNDcwLjY0MiA0NDIuMDI5TDQ3MC42NDEgNDQyLjAyOEM0NjIuNDE1IDQxNy45ODIgNDU2LjM5MiA0MDAuMzgxIDQ0Ni4wMzEgMzgxLjk5OUM0NDAuNTU3IDM3Mi4zMzEgNDMyLjE3NiAzNjUuNTY2IDQyNC44MjcgMzU5LjYzM0w0MjQuMzU4IDM1OS4yNTRDNDE0LjYwNyAzNTEuNjgxIDQwOS41NSAzNDQuNzA5IDQwOC40OTUgMzM5LjUwOUM0MDcuNTIyIDMzNC4zNSA0MDYuOTk2IDMyNC42MjcgNDIzLjY2NCAzMDIuMjE1QzQ0MC4yOTUgMjc5LjkzMSA0NDIuNjI2IDI2My4wOTYgNDM0LjMwNCAyNTQuNDA5QzQzMS4yODYgMjUxLjMxOSA0MjYuMTQ0IDI0OS4zMzkgNDE5LjU0IDI0OS4zMzlDNDA3Ljg1OSAyNDkuMzM5IDM5MS42MjggMjU1LjUyOCAzNzQuOTAxIDI3Mi41MjlDMzU0LjU5OCAyOTMuMzMzIDM1OS4xNDcgMzEzLjMxNSAzNjIuMTE2IDMyNi4zNjJDMzYyLjk1IDMzMC4wMjQgMzYzLjY2IDMzMy4xNDIgMzYzLjY2IDMzNS41NzZDMzYzLjY2IDM0Ni42NzQgMzU4Ljg5NiAzNTIuOTUxIDM0My4yOTIgMzY4LjA0OUMzMjcuNTc0IDM4My4yMTQgMzIyLjE0OSAzOTYuMjE3IDMyMC4zNTEgNDQ4LjQ3M0MzMTkuNjYzIDQ3NS4zOTYgMzE0LjkyMSA0OTAuODk2IDMxMC42NjQgNTA0LjYzOUMzMDYuOTg2IDUxNi42ODUgMzAzLjYwMyA1MjguMDA4IDMwMy40MjEgNTQ0LjM3MUMzMDMuMTI5IDU2Mi41MDMgMzA2LjE0NyA1NzQuMTg4IDMwOS42NjkgNTg3LjY3MUMzMTMuMTI3IDYwMC4xMzIgMzE2LjggNjE0LjQxMiAzMTkuMTUzIDYzOC4yOTRDMzIzLjIwNyA2NzguMzUgMzIxLjM0MiA3MTEuNjY5IDMxMi45NzQgNzQ2LjQyNUwzMTIuNTQ5IDc0OC43MjVMMzEyLjQ2MSA3NDkuMDc1QzMxMS4wODYgNzU0LjYxOSAzMDkuNDUzIDc2MS4yIDMwNy4yNiA3NjMuN0MyMjMuNDIyIDcwNC4xNSAxNjguNzUgNjA2Ljg5OCAxNjguNzUgNDk2Ljk2NEMxNjguNzUgMzE1LjcxMiAzMTcuMDU3IDE2OC43NSA1MDAuMDE2IDE2OC43NVpNNTE1LjQzOCA1MjMuODQ3QzQ5OC45NDYgNTIxLjI1MSA0ODYuODAxIDUyMy42NDUgNDc4LjI1MSA1MzAuODc0QzQ1Ni4xODEgNTQ5LjY3IDQ1Ni41NTggNjAyLjA1IDQ1NyA2NjIuOEw0NTcuMTEgNjgwQzQ1Ny4zNjggNzQwLjIyNSA0NTcuNzA2IDc5Mi4zIDQ3MS43NjcgODE1LjE4N0M0NzYuMjUxIDgyMi40OTQgNDg0LjcyMSA4MjcuODM3IDQ5NS45ODkgODMxLjAzOEM0OTYuODE1IDgzMS4wNjMgNDk3LjY0MSA4MzEuMDg4IDQ5OC40NjYgODMxLjExOUM1MDAuNTU1IDgzMS4xOTQgNTAyLjY0NiA4MzEuMjY5IDUwNC43NjMgODMxLjI2OUM1MzIuNjQ0IDgzMS4yNjkgNTU5LjcxNCA4MjcuODE5IDU4NS42MTEgODIxLjQ0NEM1OTYuMzE0IDgxNi4yODEgNjA0LjA2NiA4MTAuMDg3IDYwNi43MjcgODAzLjYzMUM2MDguMzIyIDc5OS40NDQgNjA5LjE5OCA3OTEuODE5IDYwOS4xOTggNzgxLjg4OEM2MDkuMTk4IDc0Mi41NDQgNTk3LjY0NSA2NjcuNSA1OTEuOTM1IDYzMC40MDZMNTkxLjc2NiA2MjkuMzA2TDU4OC44NzkgNjEwLjA4OUw1ODguMzM0IDYwNi4zMDFMNTg4LjMwOCA2MDYuMTE5QzU4My40NzIgNTcyLjAzOCA1NzguMDA0IDUzMy41MDYgNTE1LjQzOCA1MjMuODQ3Wk00MDguOTczIDc2Ni41QzQwNy4zMTMgNzE4LjU4MSAzOTkuMDUxIDY1NS4zODEgMzg2LjIwMiA2NTYuMTA2QzM3Mi4zNTEgNjU2Ljk1NiAzNjcuMDgyIDcyOS4wNTYgMzczLjE0NyA3NzcuMTg4QzM3NS4xMzQgNzkyLjUwNiAzNzguMjYxIDgwNC4yIDM4Mi4zNTMgODExLjYzMUMzODguNDg0IDgxNC4xMTkgMzk0LjcwNiA4MTYuNDA2IDQwMS4wMzkgODE4LjUxOUM0MDYuNjM0IDgxMy41ODcgNDEwLjEzOCA3OTkuODY5IDQwOC45NzMgNzY2LjVaTTcwOC4zNjIgNzUwLjUyNUM3MTEuMzYyIDczNS4yNjkgNjc1LjE2MiA2NDguODgxIDY1NC45NjIgNjU4LjYzOEM2MzkuNDYzIDY2Ni4zMjUgNjQ1LjQ3NSA3NTQuNTk0IDY2MS40ODcgNzgyLjczMUM2NjMuMTU2IDc4NS41NTYgNjY2LjU3NSA3ODYuMDA2IDY3MC40MjUgNzg1LjM1NkM2ODIuNTA2IDc3OC4wNzUgNjk0LjA1NiA3NjkuOTg3IDcwNS4wMzcgNzYxLjE2OUM3MDYuNDMxIDc1OC4zMDYgNzA3LjU2MiA3NTQuOTE5IDcwOC4zNjIgNzUwLjUyNVoiIGZpbGw9IiNGMTQ2MzUiLz4KPC9zdmc+",
+      "kaspiIconWhite": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjE2OC43NSAxNjguNzUgNjYyLjUgNjYyLjUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik01MDAuMDE2IDE2OC43NUM2ODIuNDk0IDE2OC43NSA4MzAuNDg4IDMxNC45MiA4MzEuMjUgNDk1LjUzNlY0OTguMzc2QzgzMC45MTkgNTc4LjY3OCA4MDEuMzY5IDY1Mi4xNDQgNzUyLjY4MSA3MDkuMDEzQzc1MC45MTMgNzA4LjEyNSA3NDcuNjk0IDcwNS4yMjUgNzQxLjg1NiA2OTYuNDk0QzczNS44MTkgNjg3LjcxOSA2ODMuNzM3IDYwNy41NjYgNjgzLjczNyA1MTUuNzAxQzY4My43MzcgNDk3LjY3MyA3MDkuNzI1IDQ2OS41MDkgNzMyLjcxOSA0NDQuNzg4TDczMy4yMTMgNDQ0LjI1N0M3NTAuMjE5IDQyNS44NTQgNzY2LjI1IDQwOC41MDkgNzcyLjE4OCAzOTQuODUxQzc3OS44MjUgMzc3LjA1NiA3NzQuNDgxIDM2NC42MzEgNzY2LjAzMSAzNjAuNDE5Qzc1OC4zODEgMzU2LjY3NiA3NDYuODk0IDM1OS40MDYgNzM4LjgzNyAzNzMuNzIxQzcyNS42MTIgMzk2Ljg4NyA3MjEuMzc1IDQwMS4yMTYgNzAyLjA4MSA0MTYuNzE3QzY4My4xIDQzMi4yMTEgNjUyLjkxOSA0NDcuODA2IDY1Mi45MTkgNDI3LjYxOEM2NTIuOTE5IDQyMC4yNTYgNjYwLjU4OCA0MDYuNjA5IDY2OC4xMTkgMzkzLjE5M0w2NjguMTI1IDM5My4xOTJDNjcxLjc0NCAzODYuNzQxIDY3NS4zMzggMzgwLjM0NCA2NzguMDMxIDM3NC43MjZDNjg2LjUxMyAzNTcuMjI5IDY3Ny4zNzUgMzQ0LjU2MyA2NTkuODYzIDM0NC41NjNDNjI1LjQ3NSAzNDQuNTYzIDYwMi42NTMgMzg4LjM2NyA2MDIuNjUzIDQwMy41NDFDNjAyLjY1MyA0MTAuODM0IDYwNC4zNTQgNDE1LjExOSA2MDYuMTIxIDQxOS41NjdDNjA4LjAyNyA0MjQuMzY3IDYxMC4wMDggNDI5LjM1NyA2MTAuMDA4IDQzOC41MjJDNjEwLjAwOCA0NTYuMzE0IDU3Mi4yOCA0NzkuMzkgNTM2Ljc0MSA0NzkuMzlDNTAwLjk3MSA0NzkuMzkgNDgwLjkwOSA0NzEuODIxIDQ3My40MTQgNDUwLjIxNEw0NzEuMDM3IDQ0My4xODNMNDcwLjY0MiA0NDIuMDI5TDQ3MC42NDEgNDQyLjAyOEM0NjIuNDE1IDQxNy45ODIgNDU2LjM5MiA0MDAuMzgxIDQ0Ni4wMzEgMzgxLjk5OUM0NDAuNTU3IDM3Mi4zMzEgNDMyLjE3NiAzNjUuNTY2IDQyNC44MjcgMzU5LjYzM0w0MjQuMzU4IDM1OS4yNTRDNDE0LjYwNyAzNTEuNjgxIDQwOS41NSAzNDQuNzA5IDQwOC40OTUgMzM5LjUwOUM0MDcuNTIyIDMzNC4zNSA0MDYuOTk2IDMyNC42MjcgNDIzLjY2NCAzMDIuMjE1QzQ0MC4yOTUgMjc5LjkzMSA0NDIuNjI2IDI2My4wOTYgNDM0LjMwNCAyNTQuNDA5QzQzMS4yODYgMjUxLjMxOSA0MjYuMTQ0IDI0OS4zMzkgNDE5LjU0IDI0OS4zMzlDNDA3Ljg1OSAyNDkuMzM5IDM5MS42MjggMjU1LjUyOCAzNzQuOTAxIDI3Mi41MjlDMzU0LjU5OCAyOTMuMzMzIDM1OS4xNDcgMzEzLjMxNSAzNjIuMTE2IDMyNi4zNjJDMzYyLjk1IDMzMC4wMjQgMzYzLjY2IDMzMy4xNDIgMzYzLjY2IDMzNS41NzZDMzYzLjY2IDM0Ni42NzQgMzU4Ljg5NiAzNTIuOTUxIDM0My4yOTIgMzY4LjA0OUMzMjcuNTc0IDM4My4yMTQgMzIyLjE0OSAzOTYuMjE3IDMyMC4zNTEgNDQ4LjQ3M0MzMTkuNjYzIDQ3NS4zOTYgMzE0LjkyMSA0OTAuODk2IDMxMC42NjQgNTA0LjYzOUMzMDYuOTg2IDUxNi42ODUgMzAzLjYwMyA1MjguMDA4IDMwMy40MjEgNTQ0LjM3MUMzMDMuMTI5IDU2Mi41MDMgMzA2LjE0NyA1NzQuMTg4IDMwOS42NjkgNTg3LjY3MUMzMTMuMTI3IDYwMC4xMzIgMzE2LjggNjE0LjQxMiAzMTkuMTUzIDYzOC4yOTRDMzIzLjIwNyA2NzguMzUgMzIxLjM0MiA3MTEuNjY5IDMxMi45NzQgNzQ2LjQyNUwzMTIuNTQ5IDc0OC43MjVMMzEyLjQ2MSA3NDkuMDc1QzMxMS4wODYgNzU0LjYxOSAzMDkuNDUzIDc2MS4yIDMwNy4yNiA3NjMuN0MyMjMuNDIyIDcwNC4xNSAxNjguNzUgNjA2Ljg5OCAxNjguNzUgNDk2Ljk2NEMxNjguNzUgMzE1LjcxMiAzMTcuMDU3IDE2OC43NSA1MDAuMDE2IDE2OC43NVpNNTE1LjQzOCA1MjMuODQ3QzQ5OC45NDYgNTIxLjI1MSA0ODYuODAxIDUyMy42NDUgNDc4LjI1MSA1MzAuODc0QzQ1Ni4xODEgNTQ5LjY3IDQ1Ni41NTggNjAyLjA1IDQ1NyA2NjIuOEw0NTcuMTEgNjgwQzQ1Ny4zNjggNzQwLjIyNSA0NTcuNzA2IDc5Mi4zIDQ3MS43NjcgODE1LjE4N0M0NzYuMjUxIDgyMi40OTQgNDg0LjcyMSA4MjcuODM3IDQ5NS45ODkgODMxLjAzOEM0OTYuODE1IDgzMS4wNjMgNDk3LjY0MSA4MzEuMDg4IDQ5OC40NjYgODMxLjExOUM1MDAuNTU1IDgzMS4xOTQgNTAyLjY0NiA4MzEuMjY5IDUwNC43NjMgODMxLjI2OUM1MzIuNjQ0IDgzMS4yNjkgNTU5LjcxNCA4MjcuODE5IDU4NS42MTEgODIxLjQ0NEM1OTYuMzE0IDgxNi4yODEgNjA0LjA2NiA4MTAuMDg3IDYwNi43MjcgODAzLjYzMUM2MDguMzIyIDc5OS40NDQgNjA5LjE5OCA3OTEuODE5IDYwOS4xOTggNzgxLjg4OEM2MDkuMTk4IDc0Mi41NDQgNTk3LjY0NSA2NjcuNSA1OTEuOTM1IDYzMC40MDZMNTkxLjc2NiA2MjkuMzA2TDU4OC44NzkgNjEwLjA4OUw1ODguMzM0IDYwNi4zMDFMNTg4LjMwOCA2MDYuMTE5QzU4My40NzIgNTcyLjAzOCA1NzguMDA0IDUzMy41MDYgNTE1LjQzOCA1MjMuODQ3Wk00MDguOTczIDc2Ni41QzQwNy4zMTMgNzE4LjU4MSAzOTkuMDUxIDY1NS4zODEgMzg2LjIwMiA2NTYuMTA2QzM3Mi4zNTEgNjU2Ljk1NiAzNjcuMDgyIDcyOS4wNTYgMzczLjE0NyA3NzcuMTg4QzM3NS4xMzQgNzkyLjUwNiAzNzguMjYxIDgwNC4yIDM4Mi4zNTMgODExLjYzMUMzODguNDg0IDgxNC4xMTkgMzk0LjcwNiA4MTYuNDA2IDQwMS4wMzkgODE4LjUxOUM0MDYuNjM0IDgxMy41ODcgNDEwLjEzOCA3OTkuODY5IDQwOC45NzMgNzY2LjVaTTcwOC4zNjIgNzUwLjUyNUM3MTEuMzYyIDczNS4yNjkgNjc1LjE2MiA2NDguODgxIDY1NC45NjIgNjU4LjYzOEM2MzkuNDYzIDY2Ni4zMjUgNjQ1LjQ3NSA3NTQuNTk0IDY2MS40ODcgNzgyLjczMUM2NjMuMTU2IDc4NS41NTYgNjY2LjU3NSA3ODYuMDA2IDY3MC40MjUgNzg1LjM1NkM2ODIuNTA2IDc3OC4wNzUgNjk0LjA1NiA3NjkuOTg3IDcwNS4wMzcgNzYxLjE2OUM3MDYuNDMxIDc1OC4zMDYgNzA3LjU2MiA3NTQuOTE5IDcwOC4zNjIgNzUwLjUyNVoiIGZpbGw9IiNGRkZGRkYiLz4KPC9zdmc+",
+      "applePayDark": "data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjE2IiB2aWV3Qm94PSIwIDAgNTEyIDIxMC4yIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgogIDxwYXRoIGQ9Ik05My42LDI3LjFDODcuNiwzNC4yLDc4LDM5LjgsNjguNCwzOWMtMS4yLTkuNiwzLjUtMTkuOCw5LTI2LjFjNi03LjMsMTYuNS0xMi41LDI1LTEyLjkKQzEwMy40LDEwLDk5LjUsMTkuOCw5My42LDI3LjEgTTEwMi4zLDQwLjljLTEzLjktMC44LTI1LjgsNy45LTMyLjQsNy45Yy02LjcsMC0xNi44LTcuNS0yNy44LTcuM2MtMTQuMywwLjItMjcuNiw4LjMtMzQuOSwyMS4yCmMtMTUsMjUuOC0zLjksNjQsMTAuNiw4NWM3LjEsMTAuNCwxNS42LDIxLjgsMjYuOCwyMS40YzEwLjYtMC40LDE0LjgtNi45LDI3LjYtNi45YzEyLjksMCwxNi42LDYuOSwyNy44LDYuNwpjMTEuNi0wLjIsMTguOS0xMC40LDI2LTIwLjhjOC4xLTExLjgsMTEuNC0yMy4zLDExLjYtMjMuOWMtMC4yLTAuMi0yMi40LTguNy0yMi42LTM0LjNjLTAuMi0yMS40LDE3LjUtMzEuNiwxOC4zLTMyLjIKQzEyMy4zLDQyLjksMTA3LjcsNDEuMywxMDIuMyw0MC45IE0xODIuNiwxMS45djE1NS45aDI0LjJ2LTUzLjNoMzMuNWMzMC42LDAsNTIuMS0yMSw1Mi4xLTUxLjRjMC0zMC40LTIxLjEtNTEuMi01MS4zLTUxLjJIMTgyLjZ6Ck0yMDYuOCwzMi4zaDI3LjljMjEsMCwzMywxMS4yLDMzLDMwLjljMCwxOS43LTEyLDMxLTMzLjEsMzFoLTI3LjhWMzIuM3ogTTMzNi42LDE2OWMxNS4yLDAsMjkuMy03LjcsMzUuNy0xOS45aDAuNXYxOC43aDIyLjRWOTAuMgpjMC0yMi41LTE4LTM3LTQ1LjctMzdjLTI1LjcsMC00NC43LDE0LjctNDUuNCwzNC45aDIxLjhjMS44LTkuNiwxMC43LTE1LjksMjIuOS0xNS45YzE0LjgsMCwyMy4xLDYuOSwyMy4xLDE5LjZ2OC42bC0zMC4yLDEuOApjLTI4LjEsMS43LTQzLjMsMTMuMi00My4zLDMzLjJDMjk4LjQsMTU1LjYsMzE0LjEsMTY5LDMzNi42LDE2OXogTTM0My4xLDE1MC41Yy0xMi45LDAtMjEuMS02LjItMjEuMS0xNS43YzAtOS44LDcuOS0xNS41LDIzLTE2LjQKbDI2LjktMS43djguOEMzNzEuOSwxNDAuMSwzNTkuNSwxNTAuNSwzNDMuMSwxNTAuNXogTTQyNS4xLDIxMC4yYzIzLjYsMCwzNC43LTksNDQuNC0zNi4zTDUxMiw1NC43aC0yNC42bC0yOC41LDkyLjFoLTAuNQpsLTI4LjUtOTIuMWgtMjUuM2w0MSwxMTMuNWwtMi4yLDYuOWMtMy43LDExLjctOS43LDE2LjItMjAuNCwxNi4yYy0xLjksMC01LjYtMC4yLTcuMS0wLjR2MTguN0M0MTcuMywyMTAsNDIzLjMsMjEwLjIsNDI1LjEsMjEwLjJ6IiBmaWxsPSJjdXJyZW50Q29sb3IiLz4KPC9zdmc+"
+    };
+
+    // ФОРМАТИРОВАНИЕ И ВЫЧИСЛЕНИЯ (Раздел 10)
+    const integerFormatter = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
+    const money = (value) => `${integerFormatter.format(value)}\u00a0₸`;
+
+    function pricing(listing, quantity = 1) {
+      const subtotal = listing.priceKzt * quantity;
+      const fee = listing.serviceFeeKzt;
+      const reference = listing.referenceValueKzt * quantity;
+      return {
+        subtotal,
+        fee,
+        total: subtotal + fee,
+        savingOnBag: reference - subtotal,
+        savingAfterFee: reference - subtotal - fee,
+        discountPercent: listing.referenceValueKzt > 0 ? Math.round((1 - listing.priceKzt / listing.referenceValueKzt) * 100) : 0,
+      };
+    }
+
+    function pickupState(order, now) {
+      if (!order) return 'none';
+      if (order.status === 'collected') return 'collected';
+      if (order.status === 'cancelled') return 'cancelled';
+      if (order.status === 'missed' || now >= order.pickupEndsAt) return 'closed';
+      if (now < order.pickupStartsAt) return 'upcoming';
+      return 'ready';
+    }
+
+    function remainingLabel(ms) {
+      const seconds = Math.ceil(Math.max(0, ms) / 1000);
+      const minutes = Math.floor(seconds / 60);
+      return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+    }
+
+    // ДЕМОНСТРАЦИОННЫЙ НАБОР ДАННЫХ (Разделы 08 и 09)
+    const at = (v) => Date.parse(v);
+
+    const demoBusinesses = {
+      'paul-demo': {
+        id: 'paul-demo',
+        name: 'Paul Bakery',
+        address: 'Алматы, пр. Достык, 42',
+        rating: 4.8,
+        reviewCount: 124,
+      },
+      'urban-demo': {
+        id: 'urban-demo',
+        name: 'Urban Fork Deli',
+        address: 'Алматы, пр. Абая, 89',
+        rating: 4.9,
+        reviewCount: 96,
+      },
+      'coffee-demo': {
+        id: 'coffee-demo',
+        name: 'Coffee Boom',
+        address: 'Алматы, ул. Курмангазы, 54',
+        rating: 4.7,
+        reviewCount: 82,
+      }
+    };
+
+    const initialListings = {
+      'paul-bakery-demo': {
+        id: 'paul-bakery-demo',
+        businessId: 'paul-demo',
+        title: 'Сюрприз-набор выпечки',
+        category: 'bakery',
+        priceKzt: 1490,
+        referenceValueKzt: 4500,
+        serviceFeeKzt: 90,
+        availableCount: 2,
+        pickupStartsAt: at('2026-10-05T20:30:00+05:00'),
+        pickupEndsAt: at('2026-10-05T21:00:00+05:00'),
+        cancelFreeUntil: at('2026-10-05T19:30:00+05:00'),
+        description: 'Обычно в наборе бывают круассаны, багеты, бриоши или десерты. Состав зависит от остатка дня.',
+        allergens: ['Пшеница', 'Молоко', 'Орехи', 'Яйца'],
+      },
+      'urban-fork-demo': {
+        id: 'urban-fork-demo',
+        businessId: 'urban-demo',
+        title: 'Вечерний гастро-набор',
+        category: 'meals',
+        priceKzt: 1850,
+        referenceValueKzt: 4400,
+        serviceFeeKzt: 90,
+        availableCount: 1,
+        pickupStartsAt: at('2026-10-05T21:00:00+05:00'),
+        pickupEndsAt: at('2026-10-05T21:45:00+05:00'),
+        cancelFreeUntil: at('2026-10-05T20:00:00+05:00'),
+        description: 'Боулы, свежие салаты и горячие закуски сегодняшнего дня.',
+        allergens: ['Кунжут', 'Соя'],
+      }
+    };
+
+    // СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+    let appState = {
+      screen: 'screen-feed',
+      selectedListingId: 'paul-bakery-demo',
+      category: 'all',
+      radiusKm: 3,
+      district: 'Бостандык',
+      favorites: new Set(),
+      reservation: null,
+      order: null,
+      paymentMethod: 'kaspi',
+      paymentRequest: 'idle',
+      reviewOpen: false,
+      reviewDraft: { rating: null, tags: [], comment: '' },
+      // Управляемые часы демонстрации (Раздел 09: 17:00 или 20:35)
+      serverNow: at('2026-10-05T17:00:00+05:00'),
+      isClockEvening: false,
+      isSoldOutDemo: false,
+      listings: JSON.parse(JSON.stringify(initialListings)),
+    };
+
+    let qrGenerated = false;
+
+    // ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ
+    function setScreen(screenId) {
+      appState.screen = screenId;
+      const allScreens = document.querySelectorAll('.screen');
+
+      if (screenId === 'screen-rate') {
+        allScreens.forEach(el => {
+          if (el.id !== 'screen-ticket' && el.id !== 'screen-rate') {
+            el.classList.add('hidden');
+          }
+        });
+        const ticket = document.getElementById('screen-ticket');
+        if (ticket) ticket.classList.remove('hidden');
+        const rate = document.getElementById('screen-rate');
+        if (rate) rate.classList.remove('hidden');
+        if (!qrGenerated) generateRealQR();
+      } else {
+        allScreens.forEach(el => el.classList.add('hidden'));
+        const target = document.getElementById(screenId);
+        if (target) target.classList.remove('hidden');
+
+        if (screenId === 'screen-ticket') {
+          updateTicketState();
+          if (!qrGenerated) generateRealQR();
+        }
+      }
+
+      // Обновление навигатора экранов в демо-тулбаре
+      document.querySelectorAll('[id^="nav-screen-"]').forEach(btn => {
+        btn.classList.remove('active', 'bg-[#23352D]', 'text-emerald-300', 'font-semibold', 'shadow-xs');
+        btn.classList.add('text-neutral-400', 'font-medium');
+      });
+      const activeNav = document.getElementById('nav-' + screenId);
+      if (activeNav) {
+        activeNav.classList.remove('text-neutral-400', 'font-medium');
+        activeNav.classList.add('active', 'bg-[#23352D]', 'text-emerald-300', 'font-semibold', 'shadow-xs');
+      }
+
+      lucide.createIcons();
+    }
+
+    // ТАБ-БАР НАВИГАЦИЯ (Раздел 16 и 25)
+    function switchTab(tab) {
+      if (tab === 'feed') {
+        setScreen('screen-feed');
+      } else if (tab === 'map') {
+        setScreen('screen-loc');
+      } else if (tab === 'orders') {
+        if (appState.order) {
+          setScreen('screen-ticket');
+        } else {
+          alert('У вас пока нет активных заказов. Выберите набор в каталоге!');
+          setScreen('screen-feed');
+        }
+      } else if (tab === 'favorites') {
+        if (appState.favorites.size > 0) {
+          alert(`В избранном сохранено ${appState.favorites.size} заведения.`);
+        } else {
+          alert('В избранном пока ничего нет. Нажмите сердечко на карточке любого набора!');
+        }
+      } else if (tab === 'profile') {
+        setScreen('screen-profile');
+      }
+    }
+
+    // ОТКРЫТИЕ ТОВАРА ИЗ КАТАЛОГА
+    function openListingDetail(listingId) {
+      appState.selectedListingId = listingId;
+      setScreen('screen-detail');
+      // Прокрутка detail к началу (Раздел 14: scroll top to top)
+      const detailScroll = document.querySelector('#screen-detail > div');
+      if (detailScroll) detailScroll.scrollTop = 0;
+    }
+
+    // ГЕНЕРАЦИЯ ЧИТАЕМОГО QR-КОДА (Раздел 23)
+    function generateRealQR() {
+      const qrContainer = document.getElementById('qrcode');
+      if (qrContainer && typeof QRCode !== 'undefined') {
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, {
+          text: "https://crumbsave.kz/order/CS-8492-PAUL-BAKERY",
+          width: 200,
+          height: 200,
+          colorDark: "#000000",
+          colorLight: "#FFFFFF",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+        qrGenerated = true;
+      }
+    }
+
+    // УПРАВЛЕНИЕ ЧАСАМИ ДЕМОНСТРАЦИИ (Разделы 09 и 23)
+    function toggleDemoClock() {
+      appState.isClockEvening = !appState.isClockEvening;
+      const timeStr = appState.isClockEvening ? '20:35' : '17:00';
+      if (appState.isClockEvening) {
+        appState.serverNow = at('2026-10-05T20:35:00+05:00');
+      } else {
+        appState.serverNow = at('2026-10-05T17:00:00+05:00');
+      }
+      const clockBtnLabel = document.getElementById('demo-clock-label');
+      if (clockBtnLabel) clockBtnLabel.innerText = `Время: ${timeStr}`;
+      const clockTopLabel = document.getElementById('demo-clock-label-top');
+      if (clockTopLabel) clockTopLabel.innerText = `Время: ${timeStr}`;
+      updateTicketState();
+    }
+
+    // ОБНОВЛЕНИЕ СТАТУСА БИЛЕТА ПО ЧАСАМ (Раздел 23)
+    function updateTicketState() {
+      const statusPill = document.getElementById('ticket-status-pill');
+      const statusText = document.getElementById('ticket-status-text');
+      const timerLabel = document.getElementById('ticket-timer-label');
+      const timerVal = document.getElementById('ticket-timer-val');
+
+      if (!statusPill || !statusText) return;
+
+      const orderStub = appState.order || {
+        status: 'paid',
+        pickupStartsAt: at('2026-10-05T20:30:00+05:00'),
+        pickupEndsAt: at('2026-10-05T21:00:00+05:00')
+      };
+
+      const state = pickupState(orderStub, appState.serverNow);
+
+      if (state === 'upcoming') {
+        statusPill.className = 'inline-flex items-center gap-1.5 bg-brandSoft text-brand px-3 py-1 rounded-full text-xs font-bold';
+        statusText.innerText = 'Выдача сегодня с 20:30';
+        if (timerLabel) timerLabel.innerText = 'Окно: 20:30–21:00';
+        if (timerVal) timerVal.innerText = 'Сегодня';
+      } else if (state === 'ready') {
+        statusPill.className = 'inline-flex items-center gap-1.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 px-3 py-1 rounded-full text-xs font-bold';
+        statusText.innerText = 'Можно забрать';
+        if (timerLabel) timerLabel.innerText = 'Заберите до 21:00';
+        if (timerVal) timerVal.innerText = '00:24:35';
+      } else if (state === 'collected') {
+        statusPill.className = 'inline-flex items-center gap-1.5 bg-brandSoft text-brand px-3 py-1 rounded-full text-xs font-bold';
+        statusText.innerText = 'Заказ получен';
+        if (timerLabel) timerLabel.innerText = 'Выдан сотрудником';
+        if (timerVal) timerVal.innerText = 'Успешно';
+      }
+    }
+
+    // ВЫБОР СПОСОБА ОПЛАТЫ (Раздел 20)
+    function selectPayment(type) {
+      appState.paymentMethod = type;
+      const optKaspi = document.getElementById('opt-kaspi');
+      const optApple = document.getElementById('opt-apple');
+      const optCard = document.getElementById('opt-card');
+      const btnAction = document.getElementById('btn-pay-action');
+      const btnTitle = document.getElementById('btn-pay-title');
+
+      // Сброс всех
+      [optKaspi, optApple, optCard].forEach(el => {
+        if (!el) return;
+        el.className = 'payment-option h-[64px] flex items-center justify-between px-3.5 cursor-pointer hover:bg-surfaceMuted transition';
+        const radio = el.querySelector('.radio-indicator');
+        if (radio) {
+          radio.className = 'radio-indicator w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600 shrink-0';
+          radio.innerHTML = '';
+        }
+      });
+
+      if (type === 'kaspi') {
+        optKaspi.className = 'payment-option h-[64px] flex items-center justify-between px-3.5 cursor-pointer bg-red-50/40 dark:bg-red-950/20 transition';
+        const radio = optKaspi.querySelector('.radio-indicator');
+        if (radio) {
+          radio.className = 'radio-indicator w-4 h-4 rounded-full border-2 border-kaspiRed flex items-center justify-center shrink-0';
+          radio.innerHTML = '<div class="w-2 h-2 rounded-full bg-kaspiRed"></div>';
+        }
+        btnAction.className = 'w-full min-h-[50px] bg-kaspiRed hover:bg-red-700 active:scale-[0.98] text-white font-bold text-sm rounded-[14px] shadow-lg flex items-center justify-between px-5 transition';
+        if (btnTitle) btnTitle.innerText = 'Оплатить в Kaspi · 1 580 ₸';
+      } else if (type === 'apple') {
+        optApple.className = 'payment-option h-[64px] flex items-center justify-between px-3.5 cursor-pointer bg-neutral-100/70 dark:bg-neutral-800/40 transition';
+        const radio = optApple.querySelector('.radio-indicator');
+        if (radio) {
+          radio.className = 'radio-indicator w-4 h-4 rounded-full border-2 border-black dark:border-white flex items-center justify-center shrink-0';
+          radio.innerHTML = '<div class="w-2 h-2 rounded-full bg-black dark:bg-white"></div>';
+        }
+        btnAction.className = 'w-full min-h-[50px] bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.98] text-white dark:text-black font-bold text-sm rounded-[14px] shadow-lg flex items-center justify-between px-5 transition';
+        if (btnTitle) btnTitle.innerText = 'Оплатить через Apple Pay · 1 580 ₸';
+      } else if (type === 'card') {
+        optCard.className = 'payment-option h-[64px] flex items-center justify-between px-3.5 cursor-pointer bg-brandSoft/50 dark:bg-brandSoft/15 transition';
+        const radio = optCard.querySelector('.radio-indicator');
+        if (radio) {
+          radio.className = 'radio-indicator w-4 h-4 rounded-full border-2 border-brand flex items-center justify-center shrink-0';
+          radio.innerHTML = '<div class="w-2 h-2 rounded-full bg-brand"></div>';
+        }
+        btnAction.className = 'w-full min-h-[50px] bg-brand hover:bg-brandHover active:scale-[0.98] text-white font-bold text-sm rounded-[14px] shadow-lg flex items-center justify-between px-5 transition';
+        if (btnTitle) btnTitle.innerText = 'Оплатить картой · 1 580 ₸';
+      }
+      lucide.createIcons();
+    }
+
+    // БРОНИРОВАНИЕ НА SCREEN 4
+    let isBookingPending = false;
+    function handleBookingStart() {
+      if (isBookingPending) return;
+      isBookingPending = true;
+      const btn = document.getElementById('btn-book-action');
+      const origHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `
+          <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          <span>Бронируем…</span>
+        `;
+      }
+      setTimeout(() => {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+        isBookingPending = false;
+        appState.reservation = {
+          id: 'res-' + Date.now(),
+          listingId: appState.selectedListingId,
+          quantity: 1,
+          expiresAt: Date.now() + 282000,
+          status: 'held',
+          idempotencyKey: 'idemp-' + Date.now(),
+        };
+        startCheckoutTimer();
+        setScreen('screen-checkout');
+      }, 300);
+    }
+
+    // ТАЙМЕР УДЕРЖАНИЯ БРОНИ (Раздел 21)
+    let checkoutTimerInterval = null;
+    let checkoutSeconds = 282; // 04:42
+
+    function startCheckoutTimer() {
+      if (checkoutTimerInterval) clearInterval(checkoutTimerInterval);
+      checkoutSeconds = 282;
+      updateCheckoutTimerDisplay();
+      checkoutTimerInterval = setInterval(() => {
+        if (checkoutSeconds > 0) {
+          checkoutSeconds--;
+          updateCheckoutTimerDisplay();
+        } else {
+          clearInterval(checkoutTimerInterval);
+          handleCheckoutExpired();
+        }
+      }, 1000);
+    }
+
+    function updateCheckoutTimerDisplay() {
+      const timerEl = document.getElementById('checkout-timer');
+      if (!timerEl) return;
+      timerEl.innerText = remainingLabel(checkoutSeconds * 1000);
+    }
+
+    function handleCheckoutExpired() {
+      const banner = document.getElementById('checkout-timer-banner');
+      if (banner) {
+        banner.className = 'bg-red-500/15 border-b border-red-500/30 px-4 py-2 flex items-center justify-between text-xs text-red-900 dark:text-red-300 shrink-0';
+        banner.innerHTML = `
+          <div class="flex items-center gap-2">
+            <i data-lucide="alert-circle" class="w-4 h-4 text-red-600 stroke-[2]"></i>
+            <span class="font-bold text-[11px]">Время брони закончилось. Проверьте, доступен ли набор</span>
+          </div>
+          <button onclick="setScreen('screen-feed')" class="text-xs font-bold text-red-700 underline">В каталог</button>
+        `;
+        lucide.createIcons();
+      }
+      const payBtn = document.getElementById('btn-pay-action');
+      if (payBtn) {
+        payBtn.disabled = true;
+        payBtn.className = 'w-full min-h-[50px] bg-gray-300 dark:bg-neutral-800 text-gray-500 font-bold text-sm rounded-[14px] flex items-center justify-center cursor-not-allowed';
+        payBtn.innerText = 'Время брони закончилось';
+      }
+    }
+
+    // ОБРАБОТКА ОПЛАТЫ (Раздел 22)
+    let isPaymentPending = false;
+    function handlePaymentSubmit() {
+      if (isPaymentPending) return;
+      isPaymentPending = true;
+      const btn = document.getElementById('btn-pay-action');
+      const origHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-80', 'cursor-wait');
+        btn.innerHTML = `
+          <div class="flex items-center justify-center gap-2 w-full text-white">
+            <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span>Проверяем оплату…</span>
+          </div>
+        `;
+      }
+      setTimeout(() => {
+        if (btn) {
+          btn.disabled = false;
+          btn.classList.remove('opacity-80', 'cursor-wait');
+          btn.innerHTML = origHtml;
+        }
+        isPaymentPending = false;
+
+        // Создаем подтвержденный заказ
+        appState.order = {
+          id: 'CS-8492',
+          number: 'CS-8492',
+          listingId: appState.selectedListingId,
+          businessId: 'paul-demo',
+          quantity: 1,
+          paidTotalKzt: 1580,
+          status: 'paid',
+          pickupStartsAt: at('2026-10-05T20:30:00+05:00'),
+          pickupEndsAt: at('2026-10-05T21:00:00+05:00'),
+          qrToken: 'https://crumbsave.kz/order/CS-8492-PAUL-BAKERY',
+          fallbackPin: '4892',
+          reviewed: false,
+        };
+
+        // Активируем бейдж заказов в таб-баре
+        const badge = document.getElementById('badge-orders');
+        if (badge) badge.classList.remove('hidden');
+
+        setScreen('screen-ticket');
+      }, 400);
+    }
+
+    // ДЕМО-СКАНИРОВАНИЕ КАССИРОМ (Раздел 23)
+    function cashierConfirmPickup() {
+      if (!appState.order) {
+        appState.order = {
+          id: 'CS-8492',
+          number: 'CS-8492',
+          listingId: 'paul-bakery-demo',
+          businessId: 'paul-demo',
+          quantity: 1,
+          paidTotalKzt: 1580,
+          status: 'collected',
+          pickupStartsAt: at('2026-10-05T20:30:00+05:00'),
+          pickupEndsAt: at('2026-10-05T21:00:00+05:00'),
+          qrToken: 'CS-8492',
+          fallbackPin: '4892',
+          reviewed: false,
+        };
+      } else {
+        appState.order.status = 'collected';
+      }
+
+      // Убедиться, что показан экран билета
+      const ticket = document.getElementById('screen-ticket');
+      if (ticket) ticket.classList.remove('hidden');
+
+      // Обновить степпер этапов
+      const stepReadyCircle = document.getElementById('step-ready-circle');
+      if (stepReadyCircle) stepReadyCircle.innerHTML = '<i data-lucide="check" class="w-3 h-3 stroke-[3]"></i>';
+      const stepLine2 = document.getElementById('step-line-2');
+      if (stepLine2) stepLine2.className = 'w-5 h-px bg-brand';
+      const stepDoneCircle = document.getElementById('step-done-circle');
+      if (stepDoneCircle) {
+        stepDoneCircle.className = 'w-5 h-5 rounded-full bg-brand text-white flex items-center justify-center text-[10px] font-bold';
+        stepDoneCircle.innerHTML = '<i data-lucide="check" class="w-3 h-3 stroke-[3]"></i>';
+      }
+      const stepDoneText = document.getElementById('step-done-text');
+      if (stepDoneText) stepDoneText.className = 'text-[11px] font-bold text-brand dark:text-emerald-400';
+
+      // Обновить статус билета
+      const ticketStatusPill = document.getElementById('ticket-status-pill');
+      if (ticketStatusPill) {
+        ticketStatusPill.innerHTML = '<i data-lucide="check" class="w-3 h-3 stroke-[2.5]"></i> Заказ получен';
+        ticketStatusPill.className = 'inline-flex items-center gap-1.5 bg-brandSoft text-brand px-3 py-1 rounded-full text-xs font-bold';
+      }
+
+      // Открыть шторку отзыва поверх билета (Раздел 24)
+      const rateScreen = document.getElementById('screen-rate');
+      if (rateScreen) rateScreen.classList.remove('hidden');
+
+      // Обновить навигатор демопанели
+      document.querySelectorAll('[id^="nav-screen-"]').forEach(btn => {
+        btn.classList.remove('active', 'bg-[#23352D]', 'text-emerald-300', 'font-semibold', 'shadow-xs');
+        btn.classList.add('text-neutral-400', 'font-medium');
+      });
+      const navRate = document.getElementById('nav-screen-rate');
+      if (navRate) {
+        navRate.classList.remove('text-neutral-400', 'font-medium');
+        navRate.classList.add('active', 'bg-[#23352D]', 'text-emerald-300', 'font-semibold', 'shadow-xs');
+      }
+
+      lucide.createIcons();
+    }
+
+    // ЗАКРЫТИЕ ШТОРКИ ОТЗЫВА
+    function closeReviewSheet() {
+      const rateScreen = document.getElementById('screen-rate');
+      if (rateScreen) rateScreen.classList.add('hidden');
+      setScreen('screen-feed');
+    }
+
+    // ИЗБРАННОЕ (Раздел 16 и 30)
+    function toggleFav(e, btn, listingId = 'paul-bakery-demo') {
+      if (e) e.stopPropagation();
+      const icon = btn.querySelector('svg');
+      if (appState.favorites.has(listingId)) {
+        appState.favorites.delete(listingId);
+        btn.setAttribute('aria-pressed', 'false');
+        if (icon) {
+          icon.classList.remove('fill-brand', 'stroke-brand', 'text-brand');
+          icon.classList.add('fill-none');
+        }
+      } else {
+        appState.favorites.add(listingId);
+        btn.setAttribute('aria-pressed', 'true');
+        if (icon) {
+          icon.classList.remove('fill-none');
+          icon.classList.add('fill-brand', 'stroke-brand', 'text-brand');
+        }
+      }
+    }
+
+    // ИНТЕРАКТИВНЫЕ ЗВЕЗДЫ ОТЗЫВА (Раздел 24)
+    const starLabels = [
+      "",
+      "1 из 5 — очень плохо",
+      "2 из 5 — плохо",
+      "3 из 5 — нормально",
+      "4 из 5 — хорошо",
+      "5 из 5 — отлично"
+    ];
+
+    function setStars(count) {
+      appState.reviewDraft.rating = count;
+      const starBtns = document.querySelectorAll('.star-btn svg');
+      starBtns.forEach((star, idx) => {
+        if (idx < count) {
+          star.classList.remove('fill-none', 'stroke-current');
+          star.classList.add('fill-[#FFA800]', 'stroke-[#FFA800]');
+        } else {
+          star.classList.add('fill-none', 'stroke-current');
+          star.classList.remove('fill-[#FFA800]', 'stroke-[#FFA800]');
+        }
+      });
+
+      const labelEl = document.getElementById('star-rating-label');
+      if (labelEl) {
+        labelEl.innerText = starLabels[count] || "";
+        labelEl.className = 'text-xs font-bold text-brand dark:text-emerald-400 mt-1 h-4 transition-colors';
+      }
+
+      // Динамические чипсы тегов (Раздел 24)
+      const chipsContainer = document.getElementById('review-tags-container');
+      if (chipsContainer) {
+        const positiveTags = ["Свежая выпечка", "Быстрая выдача", "Вежливый персонал", "Удобная упаковка"];
+        const criticalTags = ["Не всё свежее", "Долгое ожидание", "Набор меньше ожиданий", "Проблема с выдачей"];
+        const tags = count >= 4 ? positiveTags : criticalTags;
+        chipsContainer.innerHTML = tags.map(tag => `
+          <button onclick="toggleTag(this)" class="tag-chip h-8 px-3 bg-surface border border-borderLine text-charcoal rounded-[10px] text-xs font-medium hover:bg-surfaceMuted transition" aria-pressed="false">
+            ${tag}
+          </button>
+        `).join('');
+      }
+
+      // Активируем кнопку «Отправить отзыв»
+      const submitBtn = document.getElementById('btn-submit-review');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.className = 'w-full min-h-[48px] bg-brand hover:bg-brandHover active:scale-[0.98] text-white font-bold text-xs rounded-2xl shadow-md transition cursor-pointer';
+      }
+    }
+
+    function toggleTag(btn) {
+      if (btn.classList.contains('bg-brand')) {
+        btn.className = 'tag-chip h-8 px-3 bg-surface border border-borderLine text-charcoal rounded-[10px] text-xs font-medium hover:bg-surfaceMuted transition';
+        btn.setAttribute('aria-pressed', 'false');
+      } else {
+        btn.className = 'tag-chip h-8 px-3 bg-brand text-white border border-brand rounded-[10px] text-xs font-semibold shadow-xs transition';
+        btn.setAttribute('aria-pressed', 'true');
+      }
+    }
+
+    function handleReviewInput(textarea) {
+      appState.reviewDraft.comment = textarea.value;
+      const counter = document.getElementById('review-counter');
+      if (counter) counter.innerText = `${textarea.value.length} / 300`;
+    }
+
+    function submitReview() {
+      const submitBtn = document.getElementById('btn-submit-review');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `
+          <div class="flex items-center justify-center gap-2">
+            <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span>Отправка отзыва...</span>
+          </div>
+        `;
+      }
+      setTimeout(() => {
+        if (appState.order) appState.order.reviewed = true;
+        alert('Спасибо за отзыв! Заказ #CS-8492 завершён.');
+        closeReviewSheet();
+      }, 350);
+    }
+
+    // ВЫБОР РАЙОНА (Раздел 15)
+    function openDistrictModal() {
+      const modal = document.getElementById('district-modal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeDistrictModal() {
+      const modal = document.getElementById('district-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function selectDistrict(name, radius) {
+      appState.district = name;
+      appState.radiusKm = radius;
+      const label = document.getElementById('feed-location-label');
+      if (label) label.innerText = `${name} · ${radius} км`;
+      closeDistrictModal();
+      setScreen('screen-feed');
+    }
+
+    function requestUserLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            selectDistrict('Алмалы', 1.5);
+          },
+          (err) => {
+            openDistrictModal();
+          },
+          { timeout: 2500 }
+        );
+      } else {
+        openDistrictModal();
+      }
+    }
+
+    // ПОИСК ПО КАТАЛОГУ
+    function toggleSearchBar() {
+      const row = document.getElementById('search-bar-row');
+      if (row) {
+        row.classList.toggle('hidden');
+        if (!row.classList.contains('hidden')) {
+          const input = document.getElementById('feed-search-input');
+          if (input) input.focus();
+        } else {
+          clearFeedSearch();
+        }
+      }
+      lucide.createIcons();
+    }
+
+    function clearFeedSearch() {
+      const input = document.getElementById('feed-search-input');
+      if (input) input.value = '';
+      handleFeedSearch('');
+    }
+
+    function handleFeedSearch(query) {
+      const q = query.toLowerCase().trim();
+      const cards = document.querySelectorAll('.feed-card');
+      let visibleCount = 0;
+      cards.forEach(card => {
+        const text = card.innerText.toLowerCase();
+        if (!q || text.includes(q)) {
+          card.style.display = 'block';
+          visibleCount++;
+        } else {
+          card.style.display = 'none';
+        }
+      });
+
+      if (visibleCount === 0 && q) {
+        showEmptyFeedWithReason('filters');
+      }
+    }
+
+    // ФИЛЬТРАЦИЯ ПО КАТЕГОРИЯМ (Разделы 16 и 17)
+    function selectCategory(btn, cat) {
+      appState.category = cat;
+      document.querySelectorAll('.cat-chip').forEach(c => {
+        c.className = 'cat-chip h-8 px-3.5 bg-surface border border-borderLine text-charcoal rounded-[10px] text-xs font-medium shrink-0 hover:bg-surfaceMuted transition';
+        c.setAttribute('aria-pressed', 'false');
+      });
+      btn.className = 'cat-chip h-8 px-3.5 bg-brand text-white rounded-[10px] text-xs font-semibold shrink-0 shadow-xs transition';
+      btn.setAttribute('aria-pressed', 'true');
+
+      const cards = document.querySelectorAll('.feed-card');
+      if (cat === 'all') {
+        cards.forEach(c => c.style.display = 'block');
+      } else if (cat === 'bakery') {
+        if (cards[0]) cards[0].style.display = 'block';
+        if (cards[1]) cards[1].style.display = 'none';
+      } else if (cat === 'meals') {
+        if (cards[0]) cards[0].style.display = 'none';
+        if (cards[1]) cards[1].style.display = 'block';
+      } else {
+        // Категория 'groceries' не имеет активных карточек -> состояние filters
+        showEmptyFeedWithReason('filters');
+      }
+    }
+
+    // ПУСТОЕ СОСТОЯНИЕ КАТАЛОГА (Раздел 17)
+    function showEmptyFeedWithReason(reason) {
+      const title = document.getElementById('empty-state-title');
+      const desc = document.getElementById('empty-state-desc');
+      const actionBtn = document.getElementById('btn-expand-radius');
+      const actionLabel = document.getElementById('btn-expand-radius-label');
+
+      if (reason === 'soldOut') {
+        if (title) title.innerText = 'На сегодня всё разобрали';
+        if (desc) desc.innerText = 'Вечерние сюрприз-наборы раскупили. Попробуйте увеличить радиус поиска или включите уведомления.';
+        if (actionLabel) actionLabel.innerText = `Посмотреть в радиусе ${appState.radiusKm + 5} км`;
+      } else if (reason === 'notPublished') {
+        if (title) title.innerText = 'Вечерние наборы ещё не появились';
+        if (desc) desc.innerText = 'Пекарни публикуют вечерние наборы перед закрытием (обычно после 19:30).';
+        if (actionLabel) actionLabel.innerText = `Посмотреть в радиусе ${appState.radiusKm + 5} км`;
+      } else if (reason === 'filters') {
+        if (title) title.innerText = 'По этим фильтрам ничего не нашлось';
+        if (desc) desc.innerText = 'Попробуйте сбросить фильтры категорий или очистить строку поиска.';
+        if (actionLabel) actionLabel.innerText = 'Сбросить фильтры';
+        if (actionBtn) actionBtn.onclick = resetFilters;
+      } else {
+        if (title) title.innerText = 'Рядом пока нет наборов';
+        if (desc) desc.innerText = 'Попробуйте увеличить радиус поиска или включите уведомления.';
+        if (actionLabel) actionLabel.innerText = `Посмотреть в радиусе ${appState.radiusKm + 5} км`;
+        if (actionBtn) actionBtn.onclick = expandSearchRadius;
+      }
+
+      setScreen('screen-empty');
+    }
+
+    function resetFilters() {
+      appState.category = 'all';
+      const allChip = document.querySelector('.cat-chip');
+      if (allChip) selectCategory(allChip, 'all');
+      setScreen('screen-feed');
+    }
+
+    // РАСШИРЕНИЕ РАДИУСА ПОИСКА: currentRadius + 5 км (Раздел 17)
+    function expandSearchRadius() {
+      const newRadius = appState.radiusKm + 5;
+      appState.radiusKm = newRadius;
+      const label = document.getElementById('feed-location-label');
+      if (label) label.innerText = `${appState.district} · ${newRadius} км`;
+      setScreen('screen-feed');
+    }
+
+    // ВКЛЮЧЕНИЕ PUSH-УВЕДОМЛЕНИЙ (Раздел 17)
+    function togglePushNotifications(input) {
+      if (input.checked) {
+        if ("Notification" in window && Notification.permission !== "granted") {
+          Notification.requestPermission().then(permission => {
+            if (permission !== "granted") {
+              input.checked = false;
+              alert("Для получения пуш-уведомлений требуется согласие в браузере.");
+            } else {
+              alert("Уведомления успешно включены! Вы получите пуш в момент появления новых наборов.");
+            }
+          }).catch(() => {
+            input.checked = true;
+          });
+        } else {
+          alert("Уведомления успешно включены! Вы получите пуш в момент появления новых наборов.");
+        }
+      }
+    }
+
+    // ДОБАВЛЕНИЕ В WALLET
+    function handleAddToWallet() {
+      alert("Электронный билет заказа #CS-8492 добавлен в Apple Wallet.");
+    }
+
+    function handleShareListing() {
+      if (navigator.share) {
+        navigator.share({
+          title: 'CrumbSave — Сюрприз-набор выпечки',
+          text: 'Смотри, какой вечерний набор в Paul Bakery за 1 490 ₸ вместо 4 500 ₸!',
+          url: 'https://crumbsave.kz/listing/paul-bakery-demo'
+        }).catch(() => {});
+      } else {
+        alert("Ссылка на набор скопирована: https://crumbsave.kz/listing/paul-bakery-demo");
+      }
+    }
+
+    // ДЕМО-СЦЕНАРИИ КРАЕВЫХ СЛУЧАЕВ (Раздел 04, 13, 18, 19, 20)
+    function demoTriggerSoldOut() {
+      appState.isSoldOutDemo = true;
+      setScreen('screen-detail');
+
+      // Согласованное отображение Sold-out на товаре (Разделы 18 и 19)
+      const stockRow = document.getElementById('detail-stock-row');
+      if (stockRow) {
+        stockRow.innerText = 'Все наборы разобрали';
+        stockRow.className = 'text-xs text-slateText font-medium mt-2';
+      }
+
+      const footerPanel = document.getElementById('detail-footer-panel');
+      if (footerPanel) {
+        footerPanel.innerHTML = `
+          <div class="flex items-center justify-between w-full">
+            <div>
+              <p class="text-sm font-bold text-charcoal">Все наборы разобрали</p>
+              <p class="text-[11px] text-slateText">Ожидаются завтра</p>
+            </div>
+            <button onclick="setScreen('screen-feed')" class="min-h-[46px] px-6 bg-brand hover:bg-brandHover text-white font-bold text-xs rounded-[14px] shadow-sm transition">
+              Посмотреть другие
+            </button>
+          </div>
+        `;
+      }
+      alert('Демо: набор в Paul Bakery распродан (Sold Out). Кнопка и статус согласованы.');
+    }
+
+    function demoTriggerExpired() {
+      setScreen('screen-checkout');
+      checkoutSeconds = 0;
+      handleCheckoutExpired();
+    }
+
+    function demoTriggerPaymentError() {
+      setScreen('screen-checkout');
+      const errBox = document.getElementById('checkout-error-msg');
+      if (errBox) errBox.classList.remove('hidden');
+      alert('Демо: сбой ответа платёжного шлюза. Сообщение об ошибке показано, бронь сохранена.');
+    }
+
+    function resetDemoState() {
+      appState.isSoldOutDemo = false;
+      appState.isClockEvening = false;
+      appState.serverNow = at('2026-10-05T17:00:00+05:00');
+      appState.favorites.clear();
+      appState.order = null;
+      appState.reservation = null;
+
+      const clockBtnLabel = document.getElementById('demo-clock-label');
+      if (clockBtnLabel) clockBtnLabel.innerText = 'Время: 17:00';
+      const clockTopLabel = document.getElementById('demo-clock-label-top');
+      if (clockTopLabel) clockTopLabel.innerText = 'Время: 17:00';
+      const sysTime = document.getElementById('system-time-display');
+      if (sysTime) sysTime.innerText = '17:00';
+
+      const stockRow = document.getElementById('detail-stock-row');
+      if (stockRow) {
+        stockRow.innerText = 'Осталось 2 набора';
+        stockRow.className = 'text-xs text-slateText font-medium mt-1.5';
+      }
+
+      const footerPanel = document.getElementById('detail-footer-panel');
+      if (footerPanel) {
+        footerPanel.innerHTML = `
+          <div id="detail-price-box" class="numeric">
+            <div class="flex items-baseline gap-2 whitespace-nowrap">
+              <del class="text-xs text-slateText tabular-nums whitespace-nowrap">4 500 ₸</del>
+              <strong class="text-2xl font-extrabold text-charcoal tabular-nums whitespace-nowrap leading-none">1 490 ₸</strong>
+            </div>
+            <div class="text-[11px] text-slateText mt-0.5 whitespace-nowrap">+ 90 ₸ сервисный сбор</div>
+          </div>
+          <button onclick="handleBookingStart()" id="btn-book-action" class="min-h-[50px] px-7 bg-brand hover:bg-brandHover active:scale-95 text-white font-bold text-sm rounded-[14px] shadow-md flex items-center gap-2 transition">
+            <span>Забронировать</span>
+          </button>
+        `;
+      }
+
+      const badge = document.getElementById('badge-orders');
+      if (badge) badge.classList.add('hidden');
+
+      const errBox = document.getElementById('checkout-error-msg');
+      if (errBox) errBox.classList.add('hidden');
+
+      setScreen('screen-feed');
+      alert('Все демоданные сброшены к начальному состоянию!');
+    }
+
+    // ТЁМНАЯ ТЕМА (Раздел 28)
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.classList.toggle('dark');
+      const icon = isDark ? 'sun' : 'moon';
+      const label = isDark ? 'Светлая' : 'Тёмная';
+
+      const btnTheme = document.getElementById('btn-theme');
+      if (btnTheme) {
+        btnTheme.innerHTML = `<i data-lucide="${icon}" class="w-3.5 h-3.5"></i> <span>${label}</span>`;
+      }
+      const btnThemeTop = document.getElementById('btn-theme-top');
+      if (btnThemeTop) {
+        btnThemeTop.innerHTML = `<i data-lucide="${icon}" class="w-3.5 h-3.5"></i> <span>${label}</span>`;
+      }
+      lucide.createIcons();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      generateRealQR();
+      updateTicketState();
+    });
+  </script>
+</body>
+</html>
