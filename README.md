@@ -36,9 +36,9 @@ npm test                      # 12 тестов логики (Node 20+)
 
 ## Структура
 
-- `index.html`, `css/style.css`, `config.js`
+- `index.html`, `css/app.css` (десктопная вёрстка 1:1 с оригиналом + мобильная до 768px), `config.js`
 - `js/lib.js` — чистая логика (Overpass-запрос, классификация, расстояния, Luhn, заказы) — покрыта тестами
-- `js/app.js` — интерфейс и роутер (`#/feed`, `#/map`, `#/place/…`, `#/checkout/…`, `#/ticket/…`, `#/orders`)
+- `js/app.js` + `js/i18n.js` — интерфейс (RU/EN/KZ) и роутер (`#/feed`, `#/map`, `#/place/…`, `#/checkout/…`, `#/ticket/…`, `#/orders`)
 - `vendor/` — Leaflet 1.9.4 и qrcode-generator 1.4.4 (локально, без CDN)
 
 Данные заведений © участники OpenStreetMap (ODbL).

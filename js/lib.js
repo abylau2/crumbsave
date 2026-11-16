@@ -270,3 +270,35 @@ export function unpackOrder(x) {
     createdAt: Date.now(),
   };
 }
+
+// ---------- Фото и подписи ----------
+// Фото — стоковые иллюстрации категории (как в первой версии сайта), а не снимки заведения.
+const PHOTO_IDS = {
+  bakery: ['1509440159596-0249088772ff', '1517433670267-08bbd4be890f', '1555507036-ab1f4038808a'],
+  ready: ['1540420773420-3366772f4999', '1501339847302-ac426a4a7cbb'],
+  groceries: ['1542838132-92c53300491e'],
+};
+export function photoFor(place, w = 640) {
+  const ids = PHOTO_IDS[place.cat] || PHOTO_IDS.ready;
+  const id = ids[hash32(place.id) % ids.length];
+  return `https://images.unsplash.com/photo-${id}?w=${w}&auto=format&fit=crop&q=70`;
+}
+
+export function logoText(name) {
+  const words = name.replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return '?';
+  if (words.length === 1) return words[0].slice(0, 4).toUpperCase();
+  return words.slice(0, 3).map((w) => w[0]).join('').toUpperCase();
+}
+
+export const DISTRICTS = [
+  { id: 'center', lat: 43.238949, lng: 76.889709 },
+  { id: 'Медеуский', lat: 43.2386, lng: 76.9617 },
+  { id: 'Бостандыкский', lat: 43.2166, lng: 76.9187 },
+  { id: 'Ауэзовский', lat: 43.2310, lng: 76.8473 },
+  { id: 'Алмалинский', lat: 43.2563, lng: 76.9137 },
+  { id: 'Жетысуский', lat: 43.2829, lng: 76.9234 },
+  { id: 'Турксибский', lat: 43.3170, lng: 76.9570 },
+  { id: 'Наурызбайский', lat: 43.2000, lng: 76.7800 },
+  { id: 'Алатауский', lat: 43.2800, lng: 76.8600 },
+];

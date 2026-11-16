@@ -3,34 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>CrumbSave — вечерние сюрприз-наборы еды рядом с вами</title>
+  <title>CrumbSave — вечерние наборы еды рядом с вами</title>
   <meta name="description" content="Находите кафе, пекарни и магазины рядом и бронируйте вечерние наборы еды по сниженной цене.">
-  <meta name="theme-color" content="#1f4d3f">
+  <meta name="theme-color" content="#1f5750">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://overpass-api.de" crossorigin>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
+  <link rel="stylesheet" href="css/app.css">
   <script src="config.js"></script>
   <script type="module" src="js/app.js"></script>
 </head>
-<body>
-  <a class="skip" href="#app">К содержимому</a>
-  <header class="top">
-    <a class="brand" href="#/feed" aria-label="CrumbSave — на главную">
-      <img src="logo.svg" alt="" width="28" height="28"><span>CrumbSave</span>
-    </a>
-    <nav class="nav" aria-label="Основная навигация">
-      <a href="#/feed" data-nav="feed">Обзор</a>
-      <a href="#/map" data-nav="map">Карта</a>
-      <a href="#/orders" data-nav="orders">Заказы</a>
-    </nav>
-  </header>
-  <div id="notice" class="notice" role="note" hidden></div>
-  <main id="app" tabindex="-1" aria-live="polite">
-    <div class="skeletons" aria-hidden="true">
-      <div class="sk"></div><div class="sk"></div><div class="sk"></div>
-    </div>
-  </main>
+<body class="bg-canvas">
+  <div id="root">
+    <div class="mx-auto max-w-6xl p-6" aria-hidden="true"><div class="h-9 w-48 skel rounded-full mb-6"></div>
+      <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3"><div class="aspect-[16/10] skel rounded-[18px]"></div><div class="aspect-[16/10] skel rounded-[18px]"></div><div class="aspect-[16/10] skel rounded-[18px]"></div></div></div>
+  </div>
   <noscript><p style="padding:24px">Для работы CrumbSave нужен JavaScript.</p></noscript>
-  <footer class="foot">CrumbSave · учебный проект · данные заведений © участники <a href="https://www.openstreetmap.org/copyright" rel="noopener" target="_blank">OpenStreetMap</a></footer>
 </body>
 </html>
