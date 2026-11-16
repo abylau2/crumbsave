@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText, addressQuery, nearestAddress,
-} from './lib.js?v=20261116m';
-import { DICT } from './i18n.js?v=20261116m';
+} from './lib.js?v=20261116n';
+import { DICT } from './i18n.js?v=20261116n';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -500,7 +500,7 @@ function renderPlace(id) {
           <p class="text-xs text-sub">${t('l.demoNote')}</p>
           <div class="flex items-center justify-between pt-4 border-t border-line gap-3">
             <div class="min-w-0"><p class="text-sm font-semibold text-ink">${esc(p.name)}</p><p class="text-xs text-sub">${p.address ? `${esc(p.address)} · ${esc(t('city'))}` : esc(t('city'))}</p></div>
-            <a href="${esc(twoGisUrl(p.name, p.lat, p.lng, p.address))}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1.5 text-sm font-bold text-brand dark:text-emerald-300 min-h-[44px] shrink-0">${icon('nav', 'w-4 h-4')} ${t('l.route')}</a>
+            <a href="${esc(twoGisUrl(p.name, p.lat, p.lng, p.address))}" data-route-id="${esc(p.id)}" data-route-name="${esc(p.name)}" data-route-lat="${p.lat}" data-route-lng="${p.lng}" data-route-addr="${esc(p.address || '')}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1.5 text-sm font-bold text-brand dark:text-emerald-300 min-h-[44px] shrink-0">${icon('nav', 'w-4 h-4')} ${t('l.route')}</a>
           </div>
           <div class="flex items-center gap-4 text-sm font-semibold text-brand dark:text-emerald-300 flex-wrap">
             ${phone ? `<a class="min-h-[44px] flex items-center" href="tel:${esc(phone)}">${t('l.call')}</a>` : ''}
@@ -877,7 +877,7 @@ async function renderTicket(id) {
           <p class="text-center text-xs text-sub">${t('t.show')}</p>
         </div>
         <div class="grid grid-cols-2 gap-2">
-          <a href="${esc(twoGisUrl(o.placeName, o.lat, o.lng, o.address))}" target="_blank" rel="noopener noreferrer" class="min-h-[48px] rounded-[14px] bg-surface border border-line text-ink font-bold text-sm flex items-center justify-center gap-2">${icon('nav', 'w-4 h-4')} ${t('l.route')}</a>
+          <a href="${esc(twoGisUrl(o.placeName, o.lat, o.lng, o.address))}" data-route-id="${esc(o.placeId)}" data-route-name="${esc(o.placeName)}" data-route-lat="${o.lat}" data-route-lng="${o.lng}" data-route-addr="${esc(o.address || '')}" target="_blank" rel="noopener noreferrer" class="min-h-[48px] rounded-[14px] bg-surface border border-line text-ink font-bold text-sm flex items-center justify-center gap-2">${icon('nav', 'w-4 h-4')} ${t('l.route')}</a>
           <a href="#/feed" class="min-h-[48px] rounded-[14px] bg-brand hover:bg-brand-hover text-white font-bold text-sm flex items-center justify-center gap-2">${t('t.more')}</a>
         </div>
       </div>
@@ -944,6 +944,19 @@ function route() {
 
 // ---------- события ----------
 root.addEventListener('click', async (e) => {
+  const rt = e.target.closest('[data-route-id]');
+  if (rt) {
+    const r = rt.dataset;
+    const known = r.routeAddr || findPlace(r.routeId)?.address || addrCache[r.routeId]?.a;
+    if (known || addrCache[r.routeId]) return; // адрес уже есть (или точно не найден) — обычная ссылка
+    e.preventDefault();
+    const w = window.open('about:blank', '_blank');
+    const tmp = { id: r.routeId, lat: Number(r.routeLat), lng: Number(r.routeLng), address: '' };
+    try { await Promise.race([resolveAddresses([tmp], 70, false), sleep(4000)]); } catch { /* ignore */ }
+    const url = twoGisUrl(r.routeName, tmp.lat, tmp.lng, tmp.address || addrCache[r.routeId]?.a || '');
+    if (w) { try { w.opener = null; } catch { /* ignore */ } w.location.href = url; } else location.href = url;
+    return;
+  }
   const tEl = e.target.closest('[data-action],[data-cat],[data-tab],[data-fav],[data-lang],[data-radius],[data-district],[data-next]');
   if (!tEl) {
     if (state.popOpen && !e.target.closest('.geo-pop')) { state.popOpen = false; refresh(); }
