@@ -16,7 +16,7 @@
       var c = JSON.parse(localStorage.getItem('cs_ov_43.239_76.890_2000') || 'null');
       if (c && Date.now() - c.t < 6 * 3600 * 1000) return;
       var a = '(around:2000,43.238949,76.889709)';
-      var q = '[out:json][timeout:20];(nwr["amenity"~"^(cafe|restaurant|fast_food)$"]["name"]' + a + ';nwr["shop"~"^(bakery|pastry|confectionery|supermarket|convenience|greengrocer)$"]["name"]' + a + ';);out center 250;';
+      var q = '[out:json][timeout:20];(nwr["amenity"~"^(cafe|restaurant|fast_food)$"]["name"]' + a + ';nwr["shop"~"^(bakery|pastry|confectionery|supermarket|convenience|greengrocer)$"]["name"]' + a + ';);out center 1500;';
       var body = 'data=' + encodeURIComponent(q);
       window.__csPrefetch = { body: body, promise: fetch('https://overpass.openstreetmap.fr/api/interpreter', { method: 'POST', body: body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
         .then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { return j && j.elements; }).catch(function () { return null; }) };
@@ -24,9 +24,9 @@
   })();
   </script>
   <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
-  <link rel="stylesheet" href="css/app.css?v=20261116h">
-  <script src="config.js?v=20261116h"></script>
-  <script type="module" src="js/app.js?v=20261116h"></script>
+  <link rel="stylesheet" href="css/app.css?v=20261116j">
+  <script src="config.js?v=20261116j"></script>
+  <script type="module" src="js/app.js?v=20261116j"></script>
 </head>
 <body class="bg-canvas">
   <div id="root">

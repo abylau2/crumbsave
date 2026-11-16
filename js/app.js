@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText, addressQuery, nearestAddress,
-} from './lib.js?v=20261116h';
-import { DICT } from './i18n.js?v=20261116h';
+} from './lib.js?v=20261116j';
+import { DICT } from './i18n.js?v=20261116j';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -55,6 +55,9 @@ const state = {
   places: [],
   status: 'idle',
   geoMsg: '',
+  geoInfo: false,
+  ipCity: sess.get('cs_ipcity', ''),
+  shown: 24,
   geoBusy: false,
   popOpen: false,
   initDone: false,
@@ -107,21 +110,46 @@ function geoErrorText(err) {
   if (err.code === 3) return t('geo.timeout');
   return t('geo.unavailable');
 }
-function locate() {
-  return new Promise((resolve) => {
-    if (!('geolocation' in navigator)) { state.geoMsg = t('geo.unsupported'); return resolve(false); }
-    state.geoBusy = true; state.geoMsg = ''; refresh();
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        state.loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        state.source = 'gps'; state.district = '';
-        sess.set('cs_loc', state.loc); sess.set('cs_src', 'gps'); sess.set('cs_district', '');
-        state.geoBusy = false; resolve(true);
-      },
-      (err) => { state.geoMsg = geoErrorText(err); state.geoBusy = false; resolve(false); },
-      { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 },
-    );
-  });
+// Примерное положение по IP — если браузер не даёт геолокацию (выключены службы
+// геолокации в macOS/Windows, отказ в разрешении, нет Wi‑Fi).
+async function ipLocate() {
+  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 5000);
+  try {
+    const r = await fetch('https://ipwho.is/?fields=success,city,latitude,longitude&lang=ru', { signal: ctl.signal });
+    const j = await r.json();
+    if (!j.success || typeof j.latitude !== 'number') return null;
+    return { lat: j.latitude, lng: j.longitude, city: j.city || '' };
+  } catch { return null; } finally { clearTimeout(to); }
+}
+function setLoc(loc, source) {
+  state.loc = { lat: loc.lat, lng: loc.lng }; state.source = source; state.district = '';
+  sess.set('cs_loc', state.loc); sess.set('cs_src', source); sess.set('cs_district', '');
+}
+function gpsOnce(opts) {
+  return new Promise((resolve) => navigator.geolocation.getCurrentPosition((pos) => resolve({ pos }), (err) => resolve({ err }), opts));
+}
+async function locate() {
+  state.geoBusy = true; state.geoMsg = ''; state.geoInfo = false; refresh();
+  let err = null;
+  if ('geolocation' in navigator) {
+    let r = await gpsOnce({ enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 });
+    if (r.err && r.err.code !== 1) r = await gpsOnce({ enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
+    if (r.pos) {
+      setLoc({ lat: r.pos.coords.latitude, lng: r.pos.coords.longitude }, 'gps');
+      state.geoBusy = false; return true;
+    }
+    err = r.err;
+  }
+  const ip = await ipLocate();
+  state.geoBusy = false;
+  if (ip && Math.abs(ip.lat - ALMATY.lat) < 1 && Math.abs(ip.lng - ALMATY.lng) < 1.5) {
+    setLoc(ip, 'ip'); state.ipCity = ip.city; sess.set('cs_ipcity', ip.city);
+    state.geoInfo = true;
+    state.geoMsg = t(err && err.code === 1 ? 'geo.ipDenied' : 'geo.ipApprox');
+    return true;
+  }
+  state.geoMsg = err ? geoErrorText(err) : t('geo.unsupported');
+  return false;
 }
 function setDistrict(id) {
   const d = DISTRICTS.find((x) => x.id === id) || DISTRICTS[0];
@@ -179,19 +207,19 @@ function applyAddr(list) {
   return list;
 }
 let addrBusy = false;
-async function resolveAddresses(list, radius = 50) {
+async function resolveAddresses(list, radius = 50, remember = true) {
   const todo = list.filter((p) => !p.address && !addrCache[p.id]).slice(0, 60);
   if (!todo.length) return false;
   const els = await overpassRace(addressQuery(todo, radius), { timeout: 30000 });
   for (const p of todo) addrCache[p.id] = { a: nearestAddress(els, p, radius + 10) || '', t: Date.now() };
   store.set('cs_addr', addrCache);
-  applyAddr(list); rememberPlaces(list);
+  applyAddr(list); if (remember) rememberPlaces(list);
   return true;
 }
 async function enrichFeedAddresses() {
   if (addrBusy) return;
   addrBusy = true;
-  try { if (await resolveAddresses(state.places)) refresh(); } catch { /* адреса — не критично */ } finally { addrBusy = false; }
+  try { if (await resolveAddresses(state.places.slice(0, Math.max(state.shown, 24)))) refresh(); } catch { /* адреса — не критично */ } finally { addrBusy = false; }
 }
 async function enrichPlaceAddress(p) {
   if (p.address || addrCache[p.id]) return;
@@ -205,6 +233,7 @@ async function enrichPlaceAddress(p) {
 
 async function loadPlaces() {
   const token = ++loadToken;
+  state.shown = 24;
   const cached = cachedOverpass(state.loc, state.radius);
   if (cached) {
     // мгновенно показываем кэш, затем тихо обновляем
@@ -327,8 +356,16 @@ function skeletonCards(n = 6) {
 
 function locLabel() {
   if (state.source === 'gps') return t('near');
+  if (state.source === 'ip') return t('near.approx');
   if (state.source === 'district') return state.district;
   return t('city');
+}
+function geoMsgHtml() {
+  if (!state.geoMsg) return '';
+  const cls = state.geoInfo ? 'bg-brand-soft text-ink' : 'bg-urgent-soft text-urgent';
+  return `<div class="px-4 pb-2"><div class="${cls} rounded-[14px] px-4 py-2.5 text-sm font-medium flex items-center justify-between gap-3" role="${state.geoInfo ? 'status' : 'alert'}">
+    <span class="flex items-center gap-2">${icon(state.geoInfo ? 'locate' : 'pin', 'w-4 h-4 shrink-0')}${esc(state.geoMsg)}</span>
+    <button class="w-8 h-8 shrink-0 rounded-full flex items-center justify-center hover:bg-muted" data-action="hide-geo" aria-label="${t('back')}">${icon('x', 'w-4 h-4')}</button></div></div>`;
 }
 function geoPopHtml() {
   if (!state.popOpen) return '';
@@ -363,16 +400,17 @@ function renderFeed() {
   if (state.status === 'loading' || state.status === 'idle') body = `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 md:gap-5">${skeletonCards()}</div>`;
   else if (state.status === 'error') body = `<div class="bg-urgent-soft text-urgent rounded-[18px] p-4 text-sm font-semibold flex items-center justify-between gap-3" role="alert"><span>${t('load.error')}</span><button class="h-9 px-4 rounded-full bg-surface text-ink border border-line" data-action="retry">${t('retry')}</button></div>`;
   else if (!list.length) body = `<div class="text-center space-y-2 pt-10"><h3 class="text-xl font-bold text-ink">${t('empty.title')}</h3><p class="text-sm text-sub">${t('empty.text')}</p></div>`;
-  else body = `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 md:gap-5">${list.slice(0, 60).map((p, i) => placeCard(p, i < 3)).join('')}</div>`;
+  else body = `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 md:gap-5">${list.slice(0, state.shown).map((p, i) => placeCard(p, i < 3)).join('')}</div>
+    ${list.length > state.shown ? `<div class="flex justify-center pt-2"><button class="h-11 px-6 rounded-full bg-surface border border-line text-ink text-sm font-bold hover:bg-muted" data-action="more">${t('feed.more', { n: Math.min(24, list.length - state.shown) })}</button></div>` : ''}`;
   shell(`
     ${cityRow(true)}
     ${state.searchOpen ? `<div class="px-4 pb-2"><input id="q" class="input" placeholder="${t('searchPh')}" value="${esc(state.q)}" aria-label="${t('search')}"></div>` : ''}
-    ${state.geoMsg ? `<div class="px-4 pb-2"><div class="bg-urgent-soft text-urgent rounded-[14px] px-4 py-2 text-sm font-semibold" role="alert">${esc(state.geoMsg)}</div></div>` : ''}
+    ${geoMsgHtml()}
     <div class="flex gap-2 px-4 py-2 overflow-x-auto no-scrollbar">
       ${cats.map((c) => `<button aria-pressed="${state.cat === c}" data-cat="${c}" class="shrink-0 h-9 px-4 rounded-full text-[13px] font-semibold border transition ${state.cat === c ? 'bg-ink text-canvas border-ink' : 'bg-surface text-ink border-line'}">${t(`cat.${c}`)}</button>`).join('')}
     </div>
     <div class="px-4 pb-6 md:pb-12 space-y-4">
-      <div class="flex items-baseline justify-between pt-2"><h3 class="text-lg md:text-2xl font-bold text-ink">${t('feed.today')}</h3><span class="text-xs md:text-sm text-sub">${t('feed.until')}</span></div>
+      <div class="flex items-baseline justify-between pt-2"><h3 class="text-lg md:text-2xl font-bold text-ink">${t('feed.today')}</h3><span class="text-xs md:text-sm text-sub">${state.status === 'ready' ? esc(t('feed.count', { n: list.length, r: state.radius / 1000 })) + ' · ' : ''}${t('feed.until')}</span></div>
       ${body}
     </div>`, 'feed');
   const qi = document.getElementById('q');
@@ -440,7 +478,7 @@ async function renderMap() {
   const gen = renderGen;
   if (state.status === 'idle') init();
   shell(`${cityRow(false)}
-    ${state.geoMsg ? `<div class="px-4 pb-2"><div class="bg-urgent-soft text-urgent rounded-[14px] px-4 py-2 text-sm font-semibold" role="alert">${esc(state.geoMsg)}</div></div>` : ''}
+    ${geoMsgHtml()}
     <div class="relative h-[calc(100dvh-140px)] md:h-[calc(100dvh-4rem-76px)] md:px-4 md:pb-4"><div id="map" class="w-full h-full z-0 md:rounded-[18px]" role="region" aria-label="${t('nav.map')}"></div></div>`, 'map', { maxw: 'md:max-w-none' });
   try {
     if (!document.querySelector('link[href="vendor/leaflet.css"]')) {
@@ -455,18 +493,25 @@ async function renderMap() {
   mapInst = L.map(el).setView([c.lat, c.lng], 14);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(mapInst);
   const pts = [[c.lat, c.lng]];
-  if (state.source === 'gps') {
+  const ring = L.circle([c.lat, c.lng], { radius: state.radius, color: '#1f5750', weight: 1.5, fillColor: '#1f5750', fillOpacity: 0.05, interactive: false }).addTo(mapInst);
+  if (state.source === 'gps' || state.source === 'ip') {
     L.circleMarker([c.lat, c.lng], { radius: 9, color: '#fff', weight: 3, fillColor: '#2563eb', fillOpacity: 1 }).addTo(mapInst).bindTooltip(t('near'));
   }
-  state.places.slice(0, 120).forEach((p) => {
+  const dots = L.layerGroup().addTo(mapInst);
+  state.places.slice(0, 400).forEach((p, idx) => {
     const o = offerFor(p);
+    let marker;
+    if (idx >= 40) {
+      marker = L.circleMarker([p.lat, p.lng], { radius: 6, color: '#fff', weight: 2, fillColor: '#1f5750', fillOpacity: 0.9 }).addTo(dots);
+      marker.bindTooltip(p.name, { direction: 'top', offset: [0, -6] });
+    }
     const pill = document.createElement('div');
     pill.style.cssText = 'display:inline-flex;width:max-content;align-items:center;gap:4px;padding:3px 8px 3px 3px;border-radius:999px;background:var(--surface);border:1px solid var(--border);box-shadow:0 2px 8px rgb(0 0 0 / 15%);font:700 11px system-ui;color:var(--text)';
-    const img = document.createElement('img'); img.alt = ''; img.src = photoFor(p, 80); img.loading = 'lazy';
+    const img = document.createElement('img'); img.alt = ''; if (idx < 40) img.src = photoFor(p, 80); img.loading = 'lazy';
     img.style.cssText = 'width:22px;height:22px;border-radius:999px;object-fit:cover';
     const cnt = document.createElement('span'); cnt.style.color = 'var(--brand)'; cnt.textContent = String(o.left);
     pill.append(img, document.createTextNode(p.name.length > 22 ? `${p.name.slice(0, 21)}…` : p.name), cnt);
-    const marker = L.marker([p.lat, p.lng], { icon: L.divIcon({ html: pill, className: '', iconSize: null, iconAnchor: [14, 14] }) }).addTo(mapInst);
+    if (!marker) marker = L.marker([p.lat, p.lng], { icon: L.divIcon({ html: pill, className: '', iconSize: null, iconAnchor: [14, 14] }), zIndexOffset: 1000 - idx }).addTo(mapInst);
     const box = document.createElement('div'); box.className = 'space-y-1 min-w-[180px]';
     const a = document.createElement('a'); a.className = 'font-bold'; a.href = `#/place/${p.id}`; a.textContent = p.name;
     const ad = document.createElement('div'); ad.className = 'text-xs'; ad.textContent = p.address || p.kind;
@@ -476,7 +521,7 @@ async function renderMap() {
     marker.bindPopup(box);
     pts.push([p.lat, p.lng]);
   });
-  if (pts.length > 1) mapInst.fitBounds(pts, { padding: [40, 40], maxZoom: 16 });
+  mapInst.fitBounds(ring.getBounds(), { padding: [20, 20] });
 }
 
 // --- аккаунт (демо: только в браузере) ---
@@ -692,7 +737,13 @@ function openKaspi() {
   m.querySelector('[data-paid]').focus();
 }
 
+function saveOrder(o) {
+  store.set('cs_orders', getOrders().map((x) => (x.id === o.id ? o : x)));
+}
+
 function markPaid(order) {
+  const fresh = findPlace(order.placeId);
+  if (!order.address) order.address = fresh?.address || addrCache[order.placeId]?.a || '';
   const orders = getOrders().filter((o) => o.id !== order.id);
   orders.unshift({ ...order, status: 'paid' });
   store.set('cs_orders', orders.slice(0, 50));
@@ -705,6 +756,16 @@ function markPaid(order) {
 async function renderTicket(id) {
   const o = getOrders().find((x) => x.id === id);
   if (!o) { shell(`<div class="px-6 pt-16 space-y-4"><p class="text-sm text-sub">${t('t.notFound')}</p><a class="${LOGIN_BTN}" href="#/feed">${t('nav.feed')}</a></div>`, 'orders', { maxw: 'md:max-w-2xl' }); return; }
+  if (!o.address) {
+    const known = findPlace(o.placeId)?.address || addrCache[o.placeId]?.a;
+    if (known) { o.address = known; saveOrder(o); }
+    else if (!addrCache[o.placeId] && o.lat) {
+      const tmp = { id: o.placeId, lat: o.lat, lng: o.lng, address: '' };
+      resolveAddresses([tmp], 70, false).then(() => {
+        if (tmp.address) { o.address = tmp.address; saveOrder(o); if (location.hash === `#/ticket/${o.id}`) route(); }
+      }).catch(() => {});
+    }
+  }
   const steps = [t('t.paid'), t('t.ready'), t('t.done')];
   const step = (i) => {
     const circle = i === 0 ? `<div class="w-8 h-8 rounded-full flex items-center justify-center bg-brand text-white">${icon('check', 'w-4 h-4')}</div>`
@@ -808,10 +869,10 @@ root.addEventListener('click', async (e) => {
   }
   const d = tEl.dataset;
   if (d.next) { sess.set('cs_next', d.next); return; }
-  if (d.cat) { state.cat = d.cat; renderFeed(); return; }
+  if (d.cat) { state.cat = d.cat; state.shown = 24; renderFeed(); return; }
   if (d.tab) { sess.set('cs_paytab', d.tab); route(); return; }
   if (d.lang) { setLang(d.lang); return; }
-  if (d.radius) { state.radius = Number(d.radius); sess.set('cs_radius', state.radius); state.popOpen = false; loadPlaces(); return; }
+  if (d.radius) { state.radius = Number(d.radius); sess.set('cs_radius', state.radius); state.popOpen = false; loadPlaces().then(() => { if (state.status === 'ready') toast(t('feed.count', { n: state.places.length, r: state.radius / 1000 })); }); return; }
   if (d.district !== undefined) { setDistrict(d.district); state.popOpen = false; loadPlaces(); return; }
   if (d.fav) {
     e.preventDefault();
@@ -824,6 +885,8 @@ root.addEventListener('click', async (e) => {
     case 'pop': state.popOpen = !state.popOpen; refresh(); break;
     case 'locate': state.popOpen = false; if (await locate()) loadPlaces(); else refresh(); break;
     case 'retry': loadPlaces(); break;
+    case 'hide-geo': state.geoMsg = ''; refresh(); break;
+    case 'more': state.shown += 24; renderFeed(); enrichFeedAddresses(); break;
     case 'search': state.searchOpen = !state.searchOpen; if (!state.searchOpen) state.q = ''; renderFeed(); break;
     case 'back': if (history.length > 1) history.back(); else location.hash = '#/feed'; break;
     case 'share': {

@@ -82,7 +82,7 @@ export function overpassQuery(lat, lng, radius) {
   return `[out:json][timeout:20];(`
     + `nwr["amenity"~"^(cafe|restaurant|fast_food)$"]["name"]${around};`
     + `nwr["shop"~"^(bakery|pastry|confectionery|supermarket|convenience|greengrocer)$"]["name"]${around};`
-    + `);out center 250;`;
+    + `);out center 1500;`;
 }
 
 const SHOP_KIND = {
