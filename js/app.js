@@ -1,9 +1,9 @@
 import {
-  ALMATY, DISTRICTS, esc, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
+  ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText, addressQuery, nearestAddress,
-} from './lib.js?v=20261116l';
-import { DICT } from './i18n.js?v=20261116l';
+} from './lib.js?v=20261116m';
+import { DICT } from './i18n.js?v=20261116m';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -191,13 +191,35 @@ function overpassRace(query, { prefetch = null, timeout = 15000 } = {}) {
   if (prefetch && prefetch.body === body) racers.unshift(prefetch.promise.then((els) => els || Promise.reject(new Error('prefetch'))));
   return Promise.any(racers).finally(() => ctls.forEach((c) => c.abort()));
 }
+const trimEls = (els) => els.map((e) => ({ type: e.type, id: e.id, lat: e.lat, lon: e.lon, center: e.center, tags: e.tags }));
 function fetchOverpass(loc, radius) {
-  return overpassRace(overpassQuery(loc.lat, loc.lng, radius), { prefetch: window.__csPrefetch }).then((els) => {
-    const trimmed = els.map((e) => ({ type: e.type, id: e.id, lat: e.lat, lon: e.lon, center: e.center, tags: e.tags }));
-    store.set(ovKey(loc, radius), { t: Date.now(), els: trimmed });
+  return overpassRace(overpassQuery(loc.lat, loc.lng, radius), { timeout: 40000 }).then((els) => {
+    const trimmed = trimEls(els);
+    store.set(ovKey(loc, radius), { t: Date.now(), els: trimmed, lat: loc.lat, lng: loc.lng, r: radius });
     return trimmed;
   });
 }
+// Быстрый первый запрос: ближайшие места (до 1,5 км, до 400 штук) — отвечает за 1–2 с.
+const QUICK_R = 1500;
+function fetchQuick(loc) {
+  return overpassRace(overpassQuery(loc.lat, loc.lng, QUICK_R, 400), { prefetch: window.__csPrefetch, timeout: 20000 }).then(trimEls);
+}
+// Любой свежий кэш, который целиком покрывает нужный круг (например, загруженный ранее радиус побольше).
+function coverFromCache(loc, radius) {
+  let best = null;
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith('cs_ov_')) continue;
+      const c = store.get(k, null);
+      if (!c || !c.r || Date.now() - c.t > OV_TTL) continue;
+      const d = haversine(loc, { lat: c.lat, lng: c.lng });
+      if (d + radius <= c.r + 50 && (!best || c.r < best.r)) best = c;
+    }
+  } catch { /* ignore */ }
+  return best ? best.els : null;
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- точные адреса (номер дома из соседнего здания OSM) ----------
 const ADDR_TTL = 7 * 24 * 3600 * 1000;
@@ -234,23 +256,30 @@ async function enrichPlaceAddress(p) {
 async function loadPlaces() {
   const token = ++loadToken;
   state.shown = 24;
-  const cached = cachedOverpass(state.loc, state.radius);
-  if (cached) {
-    // мгновенно показываем кэш, затем тихо обновляем
-    state.places = applyAddr(parseElements(cached, state.loc)); rememberPlaces(state.places); state.status = 'ready'; refresh();
-  } else { state.status = 'loading'; refresh(); }
-  try {
-    const els = await fetchOverpass(state.loc, state.radius);
+  const loc = state.loc; const radius = state.radius;
+  let shown = false;
+  const show = (els) => {
     if (token !== loadToken) return;
-    state.places = applyAddr(parseElements(els, state.loc));
+    state.places = applyAddr(parseElements(els, loc).filter((p) => p.distance == null || p.distance <= radius + 30));
     rememberPlaces(state.places);
-    state.status = 'ready';
+    state.status = 'ready'; shown = true;
+    refresh();
     setTimeout(enrichFeedAddresses, 300);
-  } catch {
+  };
+  const cover = cachedOverpass(loc, radius) || coverFromCache(loc, radius);
+  if (cover) show(cover);
+  else { state.status = 'loading'; refresh(); }
+  // 1) быстрые ближайшие места — чтобы лента появилась сразу
+  if (!cover && radius > QUICK_R) {
+    try { show(await fetchQuick(loc)); } catch { /* попробуем полный запрос */ }
     if (token !== loadToken) return;
-    if (!cached) state.status = 'error';
   }
-  refresh();
+  // 2) полный радиус, с одной повторной попыткой
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try { show(await fetchOverpass(loc, radius)); return; } catch { if (token !== loadToken) return; await sleep(1500); }
+    if (token !== loadToken) return;
+  }
+  if (!shown) { state.status = 'error'; refresh(); }
 }
 async function init() {
   if (state.initDone) return;
@@ -277,22 +306,28 @@ function langSwitch() {
   return `<div role="radiogroup" aria-label="${t('lang')}" class="inline-flex p-0.5 rounded-full bg-muted border border-line">${b('ru', 'RU', 'Русский')}${b('en', 'EN', 'English')}${b('kk', 'KZ', 'Қазақша')}</div>`;
 }
 
+const LOGO_SVG = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="13" fill="#1f5750"/><path d="M14 18h20l-1.6 17.2a3 3 0 0 1-3 2.8H18.6a3 3 0 0 1-3-2.8z" fill="#f7ecd6"/><path d="M19.5 18v-1.5a4.5 4.5 0 0 1 9 0V18" fill="none" stroke="#f7ecd6" stroke-width="2.6" stroke-linecap="round"/><path d="M24 33.5c-3.8-1.4-5.4-4.7-4.4-8.6 3.9-.6 6.6 1.3 7.3 4.6" fill="#2f7d6d"/><path d="M24 33.5c.4-3.6 2.4-6.4 6-7.6.7 3.9-1.5 6.9-6 7.6z" fill="#3fa58d"/></svg>';
+function initials(u) {
+  const src = (u?.name || u?.email || 'CS').trim();
+  const parts = src.split(/[\s._@-]+/).filter((w) => /^\p{L}/u.test(w));
+  return ((parts[0]?.[0] || 'C') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase();
+}
+function activeOrdersCount() {
+  const now = Date.now();
+  return getOrders().filter((o) => orderEnd(o) > now).length;
+}
 function headerHtml(active) {
   const nav = [['feed', 'compass', 'nav.feed'], ['map', 'map', 'nav.map'], ['favorites', 'heart', 'nav.fav'], ['orders', 'bag', 'nav.orders']];
   const user = getUser();
-  return `<header class="hidden md:block sticky top-0 z-30 h-16 border-b border-line bg-surface/90 backdrop-blur-xl">
-    <div class="max-w-6xl mx-auto h-full px-6 flex items-center gap-8">
-      <a class="flex items-center gap-2 font-extrabold text-lg text-ink" href="#/feed"><img alt="" class="w-9 h-9" src="logo.svg" width="36" height="36">CrumbSave</a>
-      <nav class="flex items-center gap-1 flex-1">
-        ${nav.map(([k, ic, key]) => `<a ${active === k ? 'aria-current="page"' : ''} class="relative flex items-center gap-2 h-10 px-4 rounded-full text-sm font-semibold transition ${active === k ? 'bg-brand-soft text-brand dark:text-emerald-300' : 'text-sub hover:text-ink hover:bg-muted'}" href="#/${k}">${icon(ic, 'w-[18px] h-[18px]')}${t(key)}</a>`).join('')}
+  const n = user ? activeOrdersCount() : 0;
+  return `<header class="cs-header hidden md:block"><div class="cs-hwrap">
+      <a class="cs-brand" href="#/feed" aria-label="CrumbSave — ${t('nav.feed')}">${LOGO_SVG}CrumbSave</a>
+      <nav class="cs-nav" aria-label="${t('nav.main')}">
+        ${nav.map(([k, ic, key]) => `<a ${active === k ? 'aria-current="page"' : ''} href="#/${k}">${icon(ic, 'w-[18px] h-[18px]')}${t(key)}${k === 'orders' && n ? `<span class="cs-badge" aria-label="${n}">${n}</span>` : ''}</a>`).join('')}
       </nav>
-      ${langSwitch()}
-      <div class="flex items-center gap-2">
-        <a class="h-10 px-4 rounded-full text-sm font-semibold text-sub hover:text-ink flex items-center" href="#/profile">${t('settings')}</a>
-        ${user
-    ? `<a class="h-10 px-5 rounded-full bg-brand hover:bg-brand-hover text-white text-sm font-bold flex items-center" href="#/profile">${esc(user.name || user.email.split('@')[0])}</a>`
-    : `<a class="h-10 px-5 rounded-full bg-brand hover:bg-brand-hover text-white text-sm font-bold flex items-center" href="#/login">${t('login')}</a>`}
-      </div>
+      ${user
+    ? `<a class="cs-user" href="#/profile" ${active === 'profile' ? 'aria-current="page"' : ''}><span class="cs-ava">${esc(initials(user))}</span>${esc(user.name || user.email.split('@')[0])}</a>`
+    : `<a class="cs-login" href="#/login">${t('login')}</a>`}
     </div></header>`;
 }
 
@@ -497,7 +532,7 @@ async function renderMap() {
   if (gen !== renderGen || !el || mapInst) return;
   const L = window.L;
   const c = state.loc || ALMATY;
-  mapInst = L.map(el).setView([c.lat, c.lng], 14);
+  mapInst = L.map(el, { zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView([c.lat, c.lng], 14);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(mapInst);
   const pts = [[c.lat, c.lng]];
   const ring = L.circle([c.lat, c.lng], { radius: state.radius, color: '#1f5750', weight: 1.5, fillColor: '#1f5750', fillOpacity: 0.05, interactive: false }).addTo(mapInst);
@@ -540,24 +575,36 @@ function requireLogin(next) {
 }
 function renderAuth(mode) {
   const isLogin = mode === 'login';
-  root.innerHTML = `<main class="mx-auto max-w-[430px] md:max-w-none min-h-dvh bg-canvas relative shadow-2xl md:shadow-none">
-    ${headerHtml('')}
-    <div class="min-h-dvh md:min-h-0 p-5 space-y-6 md:max-w-md md:mx-auto md:mt-12 md:p-8 md:bg-surface md:border md:border-line md:rounded-[28px] md:card-shadow">
-      <button aria-label="${t('back')}" data-action="back" class="w-11 h-11 rounded-full bg-surface border border-line flex items-center justify-center text-ink">${icon('back', 'w-5 h-5')}</button>
-      <div><h1 class="text-[28px] font-extrabold text-ink">${t(isLogin ? 'a.login' : 'a.register')}</h1><p class="text-sm text-sub">${t(isLogin ? 'a.loginSub' : 'a.registerSub')}</p></div>
-      <form class="space-y-3" id="auth">
-        ${isLogin ? '' : `<input class="input" name="name" required placeholder="${t('a.name')}" autocomplete="name">`}
-        <input class="input" name="email" type="email" required placeholder="${t('a.email')}" autocomplete="email">
-        <input class="input" name="pw" type="password" required placeholder="${t('a.password')}" autocomplete="${isLogin ? 'current-password' : 'new-password'}">
-        <button type="submit" class="${BTN_PRIMARY}">${t(isLogin ? 'a.submitLogin' : 'a.submitRegister')}</button>
+  root.innerHTML = `<main class="cs-auth">
+    <section class="cs-auth-side">
+      <a class="cs-brand cs-brand-light" href="#/feed">${LOGO_SVG}CrumbSave</a>
+      <div class="cs-auth-copy"><h1>${t('a.heroTitle')}</h1><p>${t('a.heroSub')}</p></div>
+      <ul><li><b>1</b>${t('a.pt1')}</li><li><b>2</b>${t('a.pt2')}</li><li><b>3</b>${t('a.pt3')}</li></ul>
+    </section>
+    <section class="cs-auth-form">
+      <form id="auth" novalidate>
+        <a class="cs-auth-back" href="#/feed">${icon('back', 'w-4 h-4')}${t('a.backToFeed')}</a>
+        <h2>${t(isLogin ? 'a.login' : 'a.register')}</h2>
+        <p class="cs-auth-switch">${t(isLogin ? 'a.noAccount' : 'a.haveAccount')} <a href="#/${isLogin ? 'register' : 'login'}">${t(isLogin ? 'a.toRegister' : 'a.toLogin')}</a></p>
+        ${isLogin ? '' : `<label class="cs-field">${t('a.name')}<input name="name" autocomplete="name" placeholder="${t('a.namePh')}"></label>`}
+        <label class="cs-field">${t('a.email')}<input name="email" type="email" autocomplete="email" placeholder="you@mail.kz"></label>
+        <label class="cs-field">${t('a.password')}<input name="pw" type="password" autocomplete="${isLogin ? 'current-password' : 'new-password'}" placeholder="••••••••"></label>
+        <p class="cs-auth-err" id="auth-err" role="alert"></p>
+        <button type="submit" class="cs-auth-btn">${t(isLogin ? 'a.submitLogin' : 'a.submitRegister')}</button>
+        <p class="cs-auth-note">${t('a.demoShort')}</p>
       </form>
-      <p class="text-xs text-sub">${t('a.demo')}</p>
-      <p class="text-sm text-sub text-center">${t(isLogin ? 'a.noAccount' : 'a.haveAccount')} <a class="font-bold text-brand dark:text-emerald-300" href="#/${isLogin ? 'register' : 'login'}">${t(isLogin ? 'a.toRegister' : 'a.toLogin')}</a></p>
-    </div></main>`;
-  document.getElementById('auth').addEventListener('submit', (e) => {
+    </section></main>`;
+  const f = document.getElementById('auth');
+  f.addEventListener('submit', (e) => {
     e.preventDefault();
-    const f = e.target;
     const email = f.email.value.trim();
+    const err = document.getElementById('auth-err');
+    let msg = '';
+    if (!isLogin && f.name.value.trim().length < 2) msg = t('a.errName');
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) msg = t('a.errEmail');
+    else if (f.pw.value.length < 4) msg = t('a.errPw');
+    err.textContent = msg;
+    if (msg) return;
     store.set('cs_user', { email, name: (f.name?.value || email.split('@')[0]).trim() });
     f.pw.value = '';
     const next = sess.get('cs_next', '#/feed'); sess.del('cs_next');
@@ -744,6 +791,34 @@ function openKaspi() {
   m.querySelector('[data-paid]').focus();
 }
 
+// Конец окна выдачи заказа: «Сегодня 21:00–22:00» → дата создания + 22:00 (или +1 день для «Завтра»).
+function orderEnd(o) {
+  const m = String(o.window || '').match(/(\d{1,2}):(\d{2})\s*$/);
+  if (!m) return 0;
+  const d = new Date(o.createdAt || Date.now());
+  d.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  if (/Завтра|Tomorrow|Ертең/.test(o.window)) d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
+
+function openHelp() {
+  const m = document.createElement('div');
+  m.className = 'kaspi-modal';
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', t('t.help'));
+  m.innerHTML = `<div class="kaspi-card" style="padding:24px!important;gap:14px!important">
+    <button class="kaspi-x" data-close aria-label="${t('back')}">✕</button>
+    <h3 class="text-xl font-extrabold text-ink">${t('h.title')}</h3>
+    <ul class="space-y-3 text-sm text-sub" style="list-style:disc;padding-left:18px">
+      <li>${t('h.q1')}</li><li>${t('h.q2')}</li><li>${t('h.q3')}</li><li>${t('h.q4')}</li></ul>
+    <button class="${BTN_PRIMARY}" data-close>${t('h.ok')}</button></div>`;
+  const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-close]')) close(); });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(m);
+  m.querySelector('.kaspi-x').focus();
+}
+
 function saveOrder(o) {
   store.set('cs_orders', getOrders().map((x) => (x.id === o.id ? o : x)));
 }
@@ -785,7 +860,7 @@ async function renderTicket(id) {
       <div class="flex items-center justify-between px-4 pt-4">
         <a aria-label="${t('back')}" href="#/orders" class="w-11 h-11 rounded-full bg-surface border border-line flex items-center justify-center text-ink">${icon('x', 'w-5 h-5')}</a>
         <span class="text-xs font-bold tracking-widest text-sub numeric">${esc(t('t.order', { n: o.id }).toUpperCase())}</span>
-        <a href="https://wa.me/?text=${encodeURIComponent(`CrumbSave ${o.id}`)}" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-brand dark:text-emerald-300 min-h-[44px] flex items-center">${t('t.help')}</a>
+        <button type="button" data-action="help" class="text-sm font-semibold text-brand dark:text-emerald-300 min-h-[44px] flex items-center">${t('t.help')}</button>
       </div>
       <div class="p-4 space-y-4">
         <div class="flex items-center px-2">${step(0)}<div class="flex-1 h-0.5 mx-1 mb-5 bg-brand"></div>${step(1)}<div class="flex-1 h-0.5 mx-1 mb-5 bg-line"></div>${step(2)}</div>
@@ -903,6 +978,7 @@ root.addEventListener('click', async (e) => {
     }
     case 'book': if (requireLogin(`#/checkout/${d.id}`)) location.hash = `#/checkout/${d.id}`; break;
     case 'kaspi': openKaspi(); break;
+    case 'help': openHelp(); break;
     case 'confirm-qr': { const dr = sess.get('cs_draft', null); if (dr) markPaid(dr); break; }
     case 'logout': store.del('cs_user'); route(); break;
     case 'theme': store.set('cs_dark', !store.get('cs_dark', false)); applyTheme(); route(); break;

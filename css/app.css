@@ -159,3 +159,43 @@ html.dark .dark\:text-emerald-300{color:var(--color-emerald-300)}html.dark .dark
 @keyframes pay-draw{to{stroke-dashoffset:0}}
 @keyframes pay-up{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .font-medium{font-weight:500}
+
+/* ---- шапка и вход (по макету) ---- */
+.cs-header{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.cs-hwrap{max-width:72rem;margin:0 auto;padding:0 24px;height:64px;display:flex;align-items:center;gap:28px}
+.cs-brand{display:flex;align-items:center;gap:10px;font-family:Manrope,-apple-system,"SF Pro Text",Inter,system-ui,sans-serif;font-weight:800;font-size:19px;color:var(--text)}
+.cs-brand svg{width:36px;height:36px;flex:none}
+.cs-nav{display:flex;gap:4px;flex:1}
+.cs-nav a{height:40px;padding:0 16px;border-radius:999px;display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;color:var(--text-secondary);transition:background .15s,color .15s}
+.cs-nav a:hover{background:var(--surface-muted);color:var(--text)}
+.cs-nav a[aria-current=page]{background:var(--brand-soft);color:var(--brand)}
+html.dark .cs-nav a[aria-current=page]{color:#9fe3d3}
+.cs-badge{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--brand);color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.cs-user{display:flex;align-items:center;gap:8px;height:40px;padding:0 14px 0 4px;border:1px solid var(--border);border-radius:999px;font-weight:600;font-size:14px;color:var(--text);max-width:240px}
+.cs-user:hover,.cs-user[aria-current=page]{background:var(--surface-muted)}
+.cs-ava{width:32px;height:32px;border-radius:999px;background:var(--brand);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.cs-login{height:40px;padding:0 18px;border-radius:999px;background:var(--brand);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center}
+.cs-login:hover{background:var(--brand-hover)}
+.cs-auth{min-height:100dvh;display:flex;flex-wrap:wrap;background:var(--bg)}
+.cs-auth-side{flex:1 1 480px;min-width:0;background:#2f5a55;color:#fff;padding:56px;display:flex;flex-direction:column;justify-content:space-between;gap:40px}
+.cs-brand-light{color:#fff;font-size:22px}.cs-brand-light svg{width:44px;height:44px}
+.cs-auth-copy{display:flex;flex-direction:column;gap:18px;max-width:480px}
+.cs-auth-side h1{font-family:Manrope,-apple-system,Inter,system-ui,sans-serif;font-size:44px;line-height:1.08;font-weight:800}
+.cs-auth-side p{font-size:17px;line-height:1.55;opacity:.92}
+.cs-auth-side ul{list-style:none;display:flex;flex-direction:column;gap:12px;font-size:15px}
+.cs-auth-side li{display:flex;gap:10px;align-items:center}
+.cs-auth-side li b{width:28px;height:28px;border-radius:999px;background:#f2b84b;color:#1b2421;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.cs-auth-form{flex:1 1 480px;min-width:0;display:flex;align-items:center;justify-content:center;padding:48px 24px}
+.cs-auth-form form{width:100%;max-width:440px;display:flex;flex-direction:column;gap:16px}
+.cs-auth-back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--text-secondary);align-self:flex-start}
+.cs-auth-back:hover{color:var(--text)}
+.cs-auth-form h2{font-family:Manrope,-apple-system,Inter,system-ui,sans-serif;font-size:30px;font-weight:800}
+.cs-auth-switch{color:var(--text-secondary)}.cs-auth-switch a{color:var(--brand);font-weight:700;text-decoration:underline}
+.cs-field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
+.cs-field input{height:52px;padding:0 16px;border-radius:14px;border:1px solid var(--border);background:var(--surface);font-size:15px;font-weight:400;color:var(--text)}
+.cs-field input:focus{border-color:var(--brand);outline:0;box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent)}
+.cs-auth-err{min-height:0;font-size:13px;color:var(--error);font-weight:600}.cs-auth-err:empty{display:none}
+.cs-auth-btn{height:54px;border-radius:14px;background:#2f5a55;color:#fff;font-weight:700;font-size:15px;margin-top:4px}
+.cs-auth-btn:hover{background:#264b47}
+.cs-auth-note{font-size:12px;color:var(--text-secondary);text-align:center}
+@media (max-width:767px){.cs-auth-side{padding:28px;gap:20px}.cs-auth-side h1{font-size:30px}.cs-auth-side ul{display:none}}

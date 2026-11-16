@@ -77,12 +77,12 @@ export const OVERPASS_ENDPOINTS = [
   'https://overpass.private.coffee/api/interpreter',
 ];
 
-export function overpassQuery(lat, lng, radius) {
+export function overpassQuery(lat, lng, radius, limit = 1500) {
   const around = `(around:${Math.round(radius)},${lat},${lng})`;
-  return `[out:json][timeout:20];(`
+  return `[out:json][timeout:40];(`
     + `nwr["amenity"~"^(cafe|restaurant|fast_food)$"]["name"]${around};`
     + `nwr["shop"~"^(bakery|pastry|confectionery|supermarket|convenience|greengrocer)$"]["name"]${around};`
-    + `);out center 1500;`;
+    + `);out center ${limit};`;
 }
 
 const SHOP_KIND = {
