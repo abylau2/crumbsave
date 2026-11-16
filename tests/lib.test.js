@@ -78,7 +78,7 @@ test('demoOffer детерминирован и окно в будущем', () 
 
 test('2ГИС: ссылка ведёт на поиск заведения рядом с точкой', () => {
   const u = twoGisUrl('Paul Bakery', 43.2445, 76.9575);
-  assert.equal(u, 'https://2gis.kz/search/Paul%20Bakery?m=76.957500,43.244500/17');
+  assert.equal(u, 'https://2gis.kz/almaty/search/Paul%20Bakery?m=76.957500,43.244500/18');
 });
 
 test('overpassQuery содержит радиус и координаты', () => {
@@ -95,4 +95,25 @@ test('b64url туда-обратно, включая кириллицу; упа�
   assert.equal(back.pin, '1234');
   assert.equal(back.status, 'paid');
   assert.throws(() => unpackOrder({}));
+});
+
+import { streetCore, nearestAddress, photoTheme } from '../js/lib.js';
+test('2GIS link targets a specific branch by address', () => {
+  assert.equal(streetCore('Абай даңғылы, 159Б'), 'Абай 159Б');
+  assert.equal(streetCore('улица Брусиловского, 199'), 'Брусиловского 199');
+  const u = twoGisUrl('Degirmen', 43.2388, 76.889, 'Абай даңғылы, 159Б');
+  assert.ok(u.startsWith('https://2gis.kz/almaty/search/Degirmen%2C%20%D0%90%D0%B1%D0%B0%D0%B9%20159%D0%91?m=76.889000,43.238800/18'), u);
+  assert.ok(twoGisUrl('X', 1, 2, 'проспект Абая').includes('/search/X?'));
+});
+test('nearestAddress picks closest building within limit', () => {
+  const els = [{ center: { lat: 43.2390, lon: 76.8891 }, tags: { 'addr:street': 'Абай даңғылы', 'addr:housenumber': '159Б' } },
+    { lat: 43.2400, lon: 76.8891, tags: { 'addr:street': 'Far', 'addr:housenumber': '1' } }];
+  assert.equal(nearestAddress(els, { lat: 43.2388, lng: 76.8890 }), 'Абай даңғылы, 159Б');
+  assert.equal(nearestAddress(els, { lat: 43.30, lng: 76.89 }), null);
+});
+test('photo theme follows cuisine and name', () => {
+  assert.equal(photoTheme({ id: 'n1', cat: 'ready', kind: 'Кафе', name: 'Degirmen' }), 'kebab');
+  assert.equal(photoTheme({ id: 'n1', cat: 'ready', kind: 'Ресторан', name: 'Кым Ган Сан', cuisine: '' }), 'korean');
+  assert.equal(photoTheme({ id: 'n1', cat: 'ready', kind: 'Ресторан', name: 'X', cuisine: 'pizza' }), 'pizza');
+  assert.equal(photoTheme({ id: 'n1', cat: 'groceries', kind: 'Супермаркет', name: 'Magnum' }), 'groceries');
 });

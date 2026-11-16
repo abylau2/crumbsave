@@ -1,9 +1,9 @@
 import {
   ALMATY, DISTRICTS, esc, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
-  parseElements, twoGisUrl, osmUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
-  packOrder, unpackOrder, photoFor, logoText,
-} from './lib.js?v=20261116g';
-import { DICT } from './i18n.js?v=20261116g';
+  parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
+  packOrder, unpackOrder, photoFor, logoText, addressQuery, nearestAddress,
+} from './lib.js?v=20261116h';
+import { DICT } from './i18n.js?v=20261116h';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -141,14 +141,14 @@ function cachedOverpass(loc, radius) {
   const c = store.get(ovKey(loc, radius), null);
   return c && Date.now() - c.t < OV_TTL ? c.els : null;
 }
-function fetchOverpass(loc, radius) {
-  const body = `data=${encodeURIComponent(overpassQuery(loc.lat, loc.lng, radius))}`;
-  const pre = window.__csPrefetch;
+// Гонка зеркал Overpass: первый сервер сразу, остальные с задержкой; побеждает самый быстрый.
+function overpassRace(query, { prefetch = null, timeout = 15000 } = {}) {
+  const body = `data=${encodeURIComponent(query)}`;
   const ctls = [];
   const one = (ep, delay) => new Promise((resolve, reject) => {
     const ctl = new AbortController(); ctls.push(ctl);
     const start = setTimeout(async () => {
-      const to = setTimeout(() => ctl.abort(), 15000);
+      const to = setTimeout(() => ctl.abort(), timeout);
       try {
         const res = await fetch(ep, { method: 'POST', body, signal: ctl.signal, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -160,27 +160,63 @@ function fetchOverpass(loc, radius) {
     ctl.signal.addEventListener('abort', () => clearTimeout(start));
   });
   const racers = OVERPASS_ENDPOINTS.map((ep, i) => one(ep, i === 0 ? 0 : 1200 * i));
-  if (pre && pre.body === body) racers.unshift(pre.promise.then((els) => els || Promise.reject(new Error('prefetch'))));
-  return Promise.any(racers).then((els) => {
-    ctls.forEach((c) => c.abort());
+  if (prefetch && prefetch.body === body) racers.unshift(prefetch.promise.then((els) => els || Promise.reject(new Error('prefetch'))));
+  return Promise.any(racers).finally(() => ctls.forEach((c) => c.abort()));
+}
+function fetchOverpass(loc, radius) {
+  return overpassRace(overpassQuery(loc.lat, loc.lng, radius), { prefetch: window.__csPrefetch }).then((els) => {
     const trimmed = els.map((e) => ({ type: e.type, id: e.id, lat: e.lat, lon: e.lon, center: e.center, tags: e.tags }));
     store.set(ovKey(loc, radius), { t: Date.now(), els: trimmed });
     return trimmed;
   });
 }
+
+// ---------- точные адреса (номер дома из соседнего здания OSM) ----------
+const ADDR_TTL = 7 * 24 * 3600 * 1000;
+const addrCache = (() => { const c = store.get('cs_addr', {}); const now = Date.now(); for (const k of Object.keys(c)) if (now - c[k].t > ADDR_TTL) delete c[k]; return c; })();
+function applyAddr(list) {
+  for (const p of list) if (!p.address && addrCache[p.id]?.a) p.address = addrCache[p.id].a;
+  return list;
+}
+let addrBusy = false;
+async function resolveAddresses(list, radius = 50) {
+  const todo = list.filter((p) => !p.address && !addrCache[p.id]).slice(0, 60);
+  if (!todo.length) return false;
+  const els = await overpassRace(addressQuery(todo, radius), { timeout: 30000 });
+  for (const p of todo) addrCache[p.id] = { a: nearestAddress(els, p, radius + 10) || '', t: Date.now() };
+  store.set('cs_addr', addrCache);
+  applyAddr(list); rememberPlaces(list);
+  return true;
+}
+async function enrichFeedAddresses() {
+  if (addrBusy) return;
+  addrBusy = true;
+  try { if (await resolveAddresses(state.places)) refresh(); } catch { /* адреса — не критично */ } finally { addrBusy = false; }
+}
+async function enrichPlaceAddress(p) {
+  if (p.address || addrCache[p.id]) return;
+  try {
+    if (await resolveAddresses([p], 70)) {
+      const live = state.places.find((x) => x.id === p.id); if (live) live.address = p.address;
+      if ((location.hash || '').startsWith(`#/place/${p.id}`)) route();
+    }
+  } catch { /* ignore */ }
+}
+
 async function loadPlaces() {
   const token = ++loadToken;
   const cached = cachedOverpass(state.loc, state.radius);
   if (cached) {
     // мгновенно показываем кэш, затем тихо обновляем
-    state.places = parseElements(cached, state.loc); rememberPlaces(state.places); state.status = 'ready'; refresh();
+    state.places = applyAddr(parseElements(cached, state.loc)); rememberPlaces(state.places); state.status = 'ready'; refresh();
   } else { state.status = 'loading'; refresh(); }
   try {
     const els = await fetchOverpass(state.loc, state.radius);
     if (token !== loadToken) return;
-    state.places = parseElements(els, state.loc);
+    state.places = applyAddr(parseElements(els, state.loc));
     rememberPlaces(state.places);
     state.status = 'ready';
+    setTimeout(enrichFeedAddresses, 300);
   } catch {
     if (token !== loadToken) return;
     if (!cached) state.status = 'error';
@@ -347,6 +383,7 @@ const INSIDE = { bakery: 'l.insideText.bakery', ready: 'l.insideText.ready', gro
 function renderPlace(id) {
   const p = findPlace(id);
   if (!p) { location.hash = '#/feed'; return; }
+  enrichPlaceAddress(p);
   const o = offerFor(p);
   const phone = p.phone ? p.phone.replace(/[^\d+]/g, '') : '';
   const fav = isFav(p.id);
@@ -368,7 +405,7 @@ function renderPlace(id) {
           <div class="space-y-1.5">
             <div class="flex items-center gap-1.5 text-sm text-sub"><span class="font-semibold text-ink">${esc(p.name)}</span>·<span>${esc(p.kind)}</span>${p.distance != null ? `·<span class="flex items-center gap-0.5">${icon('pin', 'w-3 h-3')} ${esc(fmtDist(p.distance))}</span>` : ''}</div>
             <h2 class="text-2xl md:text-4xl font-extrabold text-ink">${esc(o.title)}</h2>
-            <p class="flex items-center gap-1 text-sm text-sub">${icon('pin', 'w-4 h-4 shrink-0')} ${p.address ? esc(p.address) : esc(t('l.noAddress'))}</p>
+            <p class="flex items-center gap-1 text-sm text-sub">${icon('pin', 'w-4 h-4 shrink-0')} ${p.address ? esc(p.address) : esc(addrCache[p.id] ? t('city') : t('l.addrLoading'))}</p>
             <p class="text-sm font-semibold text-sub">${esc(leftText(o.left))} · <span class="text-urgent">${t('demo')}</span></p>
           </div>
           <div class="flex items-center justify-between p-4 rounded-[18px] bg-brand-soft">
@@ -382,11 +419,10 @@ function renderPlace(id) {
           <p class="text-sm"><span class="font-semibold text-ink">${t('l.cancel')}</span><span class="text-sub">${t('l.cancelVal')}</span></p>
           <p class="text-xs text-sub">${t('l.demoNote')}</p>
           <div class="flex items-center justify-between pt-4 border-t border-line gap-3">
-            <div class="min-w-0"><p class="text-sm font-semibold text-ink">${p.address ? esc(p.address) : '—'}</p><p class="text-xs text-sub">${esc(p.name)}</p></div>
-            <a href="${esc(twoGisUrl(p.name, p.lat, p.lng))}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1.5 text-sm font-bold text-brand dark:text-emerald-300 min-h-[44px] shrink-0">${icon('nav', 'w-4 h-4')} ${t('l.route')}</a>
+            <div class="min-w-0"><p class="text-sm font-semibold text-ink">${esc(p.name)}</p><p class="text-xs text-sub">${p.address ? `${esc(p.address)} · ${esc(t('city'))}` : esc(t('city'))}</p></div>
+            <a href="${esc(twoGisUrl(p.name, p.lat, p.lng, p.address))}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1.5 text-sm font-bold text-brand dark:text-emerald-300 min-h-[44px] shrink-0">${icon('nav', 'w-4 h-4')} ${t('l.route')}</a>
           </div>
           <div class="flex items-center gap-4 text-sm font-semibold text-brand dark:text-emerald-300 flex-wrap">
-            <a class="min-h-[44px] flex items-center" href="${esc(osmUrl(p.id, p.lat, p.lng))}" target="_blank" rel="noopener noreferrer">${t('l.osm')}</a>
             ${phone ? `<a class="min-h-[44px] flex items-center" href="tel:${esc(phone)}">${t('l.call')}</a>` : ''}
             ${p.website ? `<a class="min-h-[44px] flex items-center" href="${esc(p.website)}" target="_blank" rel="noopener noreferrer nofollow">${t('l.site')}</a>` : ''}
           </div>
@@ -690,7 +726,7 @@ async function renderTicket(id) {
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand dark:text-emerald-300"><span class="w-1.5 h-1.5 rounded-full bg-current pulse-dot"></span> ${t('t.canPick')}</span>
             <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-sub">${kaspiLogo('w-3.5 h-3.5')} Kaspi · <span class="numeric">${fmtKzt(o.price + o.fee)}</span></span>
           </div>
-          <div><h3 class="text-xl font-extrabold text-ink">${esc(o.placeName)}</h3><p class="text-sm text-sub">${esc(o.address || '—')} · ${esc(t('city'))}</p></div>
+          <div><h3 class="text-xl font-extrabold text-ink">${esc(o.placeName)}</h3><p class="text-sm text-sub">${o.address ? `${esc(o.address)} · ` : ''}${esc(t('city'))}</p></div>
           <div class="flex justify-between items-center gap-3 p-3 rounded-xl bg-muted text-sm"><span class="font-semibold text-ink numeric">${esc(t('t.window', { w: o.window }))}</span><span class="text-sub text-right">${esc(o.title)}</span></div>
           <div class="ticket-cut"></div>
           <div class="flex justify-center"><div class="p-3 bg-white rounded-2xl qr" style="width:224px" id="tqr" aria-label="QR">…</div></div>
@@ -698,7 +734,7 @@ async function renderTicket(id) {
           <p class="text-center text-xs text-sub">${t('t.show')}</p>
         </div>
         <div class="grid grid-cols-2 gap-2">
-          <a href="${esc(twoGisUrl(o.placeName, o.lat, o.lng))}" target="_blank" rel="noopener noreferrer" class="min-h-[48px] rounded-[14px] bg-surface border border-line text-ink font-bold text-sm flex items-center justify-center gap-2">${icon('nav', 'w-4 h-4')} ${t('l.route')}</a>
+          <a href="${esc(twoGisUrl(o.placeName, o.lat, o.lng, o.address))}" target="_blank" rel="noopener noreferrer" class="min-h-[48px] rounded-[14px] bg-surface border border-line text-ink font-bold text-sm flex items-center justify-center gap-2">${icon('nav', 'w-4 h-4')} ${t('l.route')}</a>
           <a href="#/feed" class="min-h-[48px] rounded-[14px] bg-brand hover:bg-brand-hover text-white font-bold text-sm flex items-center justify-center gap-2">${t('t.more')}</a>
         </div>
       </div>
