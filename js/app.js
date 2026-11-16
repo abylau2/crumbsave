@@ -128,28 +128,48 @@ function setDistrict(id) {
 }
 
 // ---------- реальные заведения (OpenStreetMap / Overpass) ----------
-async function fetchOverpass(loc, radius) {
-  const key = `cs_ov_${loc.lat.toFixed(3)}_${loc.lng.toFixed(3)}_${radius}`;
-  const cached = sess.get(key, null);
-  if (cached && Date.now() - cached.t < 10 * 60 * 1000) return cached.els;
+// Параллельные «хеджированные» запросы: первый сервер стартует сразу, следующие — с задержкой;
+// побеждает самый быстрый ответ. Результат кэшируется в localStorage на 6 часов.
+const OV_TTL = 6 * 60 * 60 * 1000;
+function ovKey(loc, radius) { return `cs_ov_${loc.lat.toFixed(3)}_${loc.lng.toFixed(3)}_${radius}`; }
+function cachedOverpass(loc, radius) {
+  const c = store.get(ovKey(loc, radius), null);
+  return c && Date.now() - c.t < OV_TTL ? c.els : null;
+}
+function fetchOverpass(loc, radius) {
   const body = `data=${encodeURIComponent(overpassQuery(loc.lat, loc.lng, radius))}`;
-  let lastErr;
-  for (const ep of OVERPASS_ENDPOINTS) {
-    const ctl = new AbortController();
-    const to = setTimeout(() => ctl.abort(), 14000);
-    try {
-      const res = await fetch(ep, { method: 'POST', body, signal: ctl.signal, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      sess.set(key, { t: Date.now(), els: json.elements || [] });
-      return json.elements || [];
-    } catch (e) { lastErr = e; } finally { clearTimeout(to); }
-  }
-  throw lastErr || new Error('overpass');
+  const pre = window.__csPrefetch;
+  const ctls = [];
+  const one = (ep, delay) => new Promise((resolve, reject) => {
+    const ctl = new AbortController(); ctls.push(ctl);
+    const start = setTimeout(async () => {
+      const to = setTimeout(() => ctl.abort(), 15000);
+      try {
+        const res = await fetch(ep, { method: 'POST', body, signal: ctl.signal, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (!json.elements) throw new Error('bad');
+        resolve(json.elements);
+      } catch (e) { reject(e); } finally { clearTimeout(to); }
+    }, delay);
+    ctl.signal.addEventListener('abort', () => clearTimeout(start));
+  });
+  const racers = OVERPASS_ENDPOINTS.map((ep, i) => one(ep, i === 0 ? 0 : 1200 * i));
+  if (pre && pre.body === body) racers.unshift(pre.promise.then((els) => els || Promise.reject(new Error('prefetch'))));
+  return Promise.any(racers).then((els) => {
+    ctls.forEach((c) => c.abort());
+    const trimmed = els.map((e) => ({ type: e.type, id: e.id, lat: e.lat, lon: e.lon, center: e.center, tags: e.tags }));
+    store.set(ovKey(loc, radius), { t: Date.now(), els: trimmed });
+    return trimmed;
+  });
 }
 async function loadPlaces() {
   const token = ++loadToken;
-  state.status = 'loading'; refresh();
+  const cached = cachedOverpass(state.loc, state.radius);
+  if (cached) {
+    // мгновенно показываем кэш, затем тихо обновляем
+    state.places = parseElements(cached, state.loc); rememberPlaces(state.places); state.status = 'ready'; refresh();
+  } else { state.status = 'loading'; refresh(); }
   try {
     const els = await fetchOverpass(state.loc, state.radius);
     if (token !== loadToken) return;
@@ -158,7 +178,7 @@ async function loadPlaces() {
     state.status = 'ready';
   } catch {
     if (token !== loadToken) return;
-    state.status = 'error';
+    if (!cached) state.status = 'error';
   }
   refresh();
 }
@@ -166,11 +186,11 @@ async function init() {
   if (state.initDone) return;
   state.initDone = true;
   if (!state.loc) { state.loc = { ...ALMATY }; state.source = 'default'; }
+  loadPlaces(); // сразу грузим город/район, не дожидаясь GPS
   try {
     const p = await navigator.permissions?.query({ name: 'geolocation' });
-    if (p && p.state === 'granted' && state.source === 'default') await locate();
+    if (p && p.state === 'granted' && state.source === 'default' && await locate()) loadPlaces();
   } catch { /* Permissions API недоступен */ }
-  loadPlaces();
 }
 
 // ---------- общие куски UI ----------

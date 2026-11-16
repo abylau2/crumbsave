@@ -71,6 +71,7 @@ export function hash32(str) {
 // ---------- OpenStreetMap / Overpass ----------
 
 export const OVERPASS_ENDPOINTS = [
+  'https://overpass.openstreetmap.fr/api/interpreter',
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
