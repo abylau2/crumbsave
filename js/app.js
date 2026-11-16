@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, osmUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText,
-} from './lib.js?v=20261116e';
-import { DICT } from './i18n.js?v=20261116e';
+} from './lib.js?v=20261116f';
+import { DICT } from './i18n.js?v=20261116f';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -87,6 +87,11 @@ const ICONS = {
   share: '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/>',
   nav: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
   locate: '<line x1="2" x2="5" y1="12" y2="12"/><line x1="19" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="5"/><line x1="12" x2="12" y1="19" y2="22"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  arrowR: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  qr: '<rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
 };
 const icon = (n, cls = 'w-4 h-4', fill = 'none') => `<svg class="${cls}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -534,6 +539,9 @@ function makeDraft(p) {
 }
 const getDraft = (placeId) => { const d = sess.get('cs_draft', null); return d && d.placeId === placeId ? d : null; };
 
+const KASPI_RED = '#d92d20';
+const kaspiLogo = (cls = 'w-5 h-5') => `<img alt="" class="${cls}" src="vendor/kaspi-logo.png" style="border-radius:22%">`;
+
 async function renderCheckout(id) {
   const p = findPlace(id);
   if (!p) { location.hash = '#/feed'; return; }
@@ -546,81 +554,58 @@ async function renderCheckout(id) {
   }
   sess.set('cs_draft', order);
   const total = order.price + order.fee;
-  const payUrl = `${location.origin}${location.pathname}#/pay/${b64urlEncode(packOrder(order))}`;
-  const method = sess.get('cs_paytab', 'qr');
-  const test = (method === 'qr' ? CFG.kaspiQrUrl : CFG.paymentLinkBase) ? '' : `<div class="rounded-[14px] bg-urgent-soft text-urgent text-xs font-semibold p-3">${t('c.test')}</div>`;
-  const opt = (m, title, sub) => `<button data-tab="${m}" role="radio" aria-checked="${method === m}" class="w-full flex items-center justify-between gap-3 p-4 rounded-[14px] border text-left transition ${method === m ? 'border-brand bg-brand-soft' : 'border-line bg-surface'}"><span><span class="block text-sm font-bold text-ink">${title}</span><span class="block text-xs text-sub">${sub}</span></span><span class="text-xs font-bold text-brand dark:text-emerald-300">${t('c.zeroFee')}</span></button>`;
   root.innerHTML = `<main class="mx-auto max-w-[430px] md:max-w-none min-h-dvh bg-canvas relative shadow-2xl md:shadow-none">${headerHtml('feed')}
-    <div class="min-h-dvh md:min-h-0 p-5 space-y-5 md:max-w-2xl md:mx-auto md:py-8">
-      <div class="flex items-center gap-3"><button aria-label="${t('back')}" data-action="back" class="w-11 h-11 rounded-full bg-surface border border-line flex items-center justify-center text-ink">${icon('back', 'w-5 h-5')}</button>
-        <h1 class="text-2xl font-extrabold text-ink flex-1">${t('c.title')}</h1></div>
-      <div class="flex items-center justify-between rounded-[18px] bg-brand-soft p-4"><div><span class="text-xs font-semibold uppercase tracking-wide text-brand dark:text-emerald-300">${t('c.held')}</span><p class="text-lg font-bold text-ink numeric" id="hold">10:00</p></div>${icon('clock', 'w-7 h-7 text-brand dark:text-emerald-300')}</div>
-      <div class="bg-surface border border-line rounded-[18px] p-4 space-y-3 card-shadow">
-        <div><h3 class="font-bold text-ink">${esc(order.placeName)}</h3><p class="text-sm text-ink">${esc(order.title)}</p><p class="text-xs text-sub">${esc(t('c.pickupAt', { window: order.window }))}</p></div>
-        <div class="space-y-2 text-sm border-t border-line pt-3">
-          <div class="flex justify-between"><span class="text-sub">${t('c.subtotal')}</span><span class="numeric text-ink">${fmtKzt(order.price)}</span></div>
-          <div class="flex justify-between"><span class="text-sub">${t('c.fee')}</span><span class="numeric text-ink">${fmtKzt(order.fee)}</span></div>
-          ${order.ref ? `<div class="flex justify-between"><span class="text-sub">${t('c.saving')}</span><span class="numeric text-brand dark:text-emerald-300 font-semibold">${fmtKzt(order.ref - order.price)}</span></div>` : ''}
-          <div class="flex justify-between font-extrabold text-base border-t border-line pt-2"><span class="text-ink">${t('c.total')}</span><span class="numeric text-ink">${fmtKzt(total)}</span></div></div></div>
-      <div class="space-y-3"><h3 class="font-bold text-ink">${t('c.method')}</h3><div role="radiogroup" class="space-y-2">${opt('qr', CFG.kaspiQrUrl ? 'Kaspi QR' : t('c.qr'), CFG.kaspiQrUrl ? t('c.kaspiSub') : t('c.qrSub'))}${opt('card', t('c.card'), t('c.cardSub'))}</div></div>
-      ${test}
-      <div id="pay-body" class="space-y-3"></div>
-      <p class="text-[11px] text-sub text-center">${t('c.offer')}</p>
+    <div class="min-h-dvh md:min-h-0 flex flex-col md:max-w-xl md:mx-auto md:py-8">
+      <div class="flex items-center gap-3 px-4 pt-4 pb-3">
+        <button aria-label="${t('back')}" data-action="back" class="w-11 h-11 rounded-full bg-surface border border-line flex items-center justify-center text-ink">${icon('back', 'w-5 h-5')}</button>
+        <div class="min-w-0"><h2 class="font-bold text-ink">${t('c.title')}</h2><p class="text-xs text-sub truncate">${esc(order.placeName)}${order.address ? ` • ${esc(order.address)}` : ''}</p></div>
+      </div>
+      <div class="bg-brand-soft px-4 py-2 md:rounded-xl flex items-center justify-between text-xs">
+        <span class="flex items-center gap-2 font-semibold text-ink"><span class="w-2 h-2 rounded-full bg-brand pulse-dot"></span> ${t('c.held')}</span>
+        <span class="flex items-center gap-1 font-bold text-brand dark:text-emerald-300 numeric">${icon('clock', 'w-3.5 h-3.5')} <span id="hold">10:00</span></span>
+      </div>
+      <div class="flex-1 p-4 space-y-4 pb-40 md:pb-4">
+        <div class="flex gap-3 items-center">
+          <img alt="" class="w-16 h-16 rounded-xl object-cover bg-muted" src="${esc(photoFor({ id: order.placeId, cat: order.cat }, 200))}">
+          <div class="min-w-0"><h5 class="font-bold text-ink">${esc(order.title)}</h5><p class="text-xs text-sub truncate">1 шт. · ${esc(order.placeName)}</p><p class="text-xs text-sub">${esc(t('c.pickupAt', { window: order.window }))}</p></div>
+        </div>
+        <div class="bg-surface border border-line rounded-[18px] overflow-hidden">
+          <div class="flex justify-between items-center px-4 py-3 border-b border-line"><span class="text-sm font-bold text-ink">${t('c.method')}</span>
+            <span class="flex items-center gap-1 text-[11px] font-semibold text-brand dark:text-emerald-300">${icon('shield', 'w-3.5 h-3.5')} ${t('c.zeroFee')}</span></div>
+          <div class="flex items-center gap-3 px-4 py-3.5">
+            <span class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#fdeceb">${kaspiLogo('w-6 h-6')}</span>
+            <span class="flex-1 min-w-0"><span class="block text-sm font-semibold text-ink">Kaspi Pay</span><span class="block text-[11px] text-sub">${t('c.kaspiSub')}</span></span>
+            <span class="w-6 h-6 rounded-full bg-brand text-white flex items-center justify-center">${icon('check', 'w-3.5 h-3.5')}</span>
+          </div>
+          <div class="px-4 pb-3.5"><div class="flex items-start gap-2 rounded-xl bg-muted px-3 py-2.5 text-[11px] text-sub">${icon('qr', 'w-4 h-4 shrink-0 text-ink')}<span>${t('c.kaspiHow')}</span></div></div>
+        </div>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between text-sub"><span>${t('c.subtotal')} (1 шт.)</span><span class="numeric">${fmtKzt(order.price)}</span></div>
+          <div class="flex justify-between text-sub"><span>${t('c.fee')}</span><span class="numeric">${fmtKzt(order.fee)}</span></div>
+          <div class="flex justify-between pt-2 border-t border-line font-extrabold text-ink text-base"><span>${t('c.total')}</span><span class="numeric">${fmtKzt(total)}</span></div>
+          ${order.ref ? `<div class="flex justify-between text-brand dark:text-emerald-300 font-semibold"><span>${t('c.saving')}</span><span class="numeric">${fmtKzt(order.ref - order.price)}</span></div>` : ''}
+          <p class="text-xs text-sub">${t('l.cancelVal')}</p>
+        </div>
+      </div>
+      <div class="fixed md:static bottom-0 inset-x-0 mx-auto max-w-[430px] md:max-w-none bg-surface md:bg-transparent border-t md:border-0 border-line p-4 pb-6 space-y-2 z-20" id="pay-body">
+        <button class="w-full min-h-[52px] rounded-[14px] px-4 font-bold text-sm text-white flex items-center justify-between kaspi-btn" style="background:${KASPI_RED}" data-action="kaspi">
+          <span class="flex items-center gap-2"><span class="w-6 h-6 rounded-md bg-white flex items-center justify-center">${kaspiLogo('w-5 h-5')}</span>${t('c.kaspiOpen')} · <span class="numeric">${fmtKzt(total)}</span></span>${icon('arrowR', 'w-4 h-4')}</button>
+        <p class="text-center text-[11px] text-sub">${t('c.offer')}</p>
+      </div>
     </div></main>`;
   const tick = () => {
     const left = HOLD_MS - (Date.now() - order.createdAt);
     const el = document.getElementById('hold');
     if (!el) return;
     if (left <= 0) {
-      clearInterval(timer);
-      sess.del('cs_draft');
-      document.getElementById('pay-body').innerHTML = `<div class="rounded-[14px] bg-urgent-soft text-urgent text-sm font-semibold p-3">${t('c.expired')}</div><a class="${BTN_PRIMARY}" href="#/place/${esc(id)}">${t('c.toListing')}</a>`;
+      clearInterval(timer); sess.del('cs_draft'); document.querySelector('.kaspi-modal')?.remove();
       el.textContent = '00:00';
+      document.getElementById('pay-body').innerHTML = `<div class="rounded-[14px] bg-urgent-soft text-urgent text-sm font-semibold p-3">${t('c.expired')}</div><a class="${BTN_PRIMARY}" href="#/place/${esc(id)}">${t('c.toListing')}</a>`;
       return;
     }
     el.textContent = `${String(Math.floor(left / 60000)).padStart(2, '0')}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
   };
   clearInterval(timer); tick(); timer = setInterval(tick, 1000);
-  const body = document.getElementById('pay-body');
-  if (method === 'qr' && CFG.kaspiQrUrl) {
-    body.innerHTML = `<button class="${BTN_PRIMARY}" style="background:#f14635" data-action="kaspi">${t('c.kaspiOpen')} · ${fmtKzt(total)}</button>`;
-  } else if (method === 'qr') {
-    body.innerHTML = `<p class="text-xs text-sub">${t('c.qrHint')}</p>
-      <div class="bg-white rounded-[18px] border border-line p-3 mx-auto qr" style="max-width:280px" id="qr" aria-label="QR">…</div>
-      <p class="text-xs text-sub text-center numeric">${esc(t('t.order', { n: order.id }))}</p>
-      <button class="${BTN_PRIMARY}" data-action="confirm-qr">${t('c.payQr')}</button>`;
-    try { document.getElementById('qr').innerHTML = await qrSvg(payUrl, 'L'); }
-    catch { const q = document.getElementById('qr'); if (q) q.textContent = 'QR недоступен'; }
-  } else {
-    body.innerHTML = `<form id="card" novalidate autocomplete="on" class="space-y-3">
-      <div><input class="input" id="cn" name="cn" inputmode="numeric" autocomplete="cc-number" placeholder="${t('c.cardNum')}" aria-label="${t('c.cardNum')}" maxlength="23"><p class="text-xs text-error mt-1" id="e-cn"></p></div>
-      <div class="grid gap-3" style="grid-template-columns:1fr 1fr">
-        <div><input class="input" id="ce" name="ce" inputmode="numeric" autocomplete="cc-exp" placeholder="${t('c.exp')}" aria-label="${t('c.exp')}" maxlength="5"><p class="text-xs text-error mt-1" id="e-ce"></p></div>
-        <div><input class="input" id="cv" name="cv" inputmode="numeric" autocomplete="cc-csc" type="password" placeholder="${t('c.cvc')}" aria-label="${t('c.cvc')}" maxlength="4"><p class="text-xs text-error mt-1" id="e-cv"></p></div></div>
-      <div><input class="input" id="cm" name="cm" autocomplete="cc-name" placeholder="${t('c.name')}" aria-label="${t('c.name')}"><p class="text-xs text-error mt-1" id="e-cm"></p></div>
-      <button class="${BTN_PRIMARY}" type="submit">${t('c.payCard')} · ${fmtKzt(total)}</button>
-      <p class="text-xs text-sub">${t('c.local')}</p></form>`;
-    const cn = document.getElementById('cn'); const ce = document.getElementById('ce');
-    cn.addEventListener('input', () => { cn.value = cn.value.replace(/\D/g, '').slice(0, 19).replace(/(.{4})/g, '$1 ').trim(); });
-    ce.addEventListener('input', () => { const d = ce.value.replace(/\D/g, '').slice(0, 4); ce.value = d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d; });
-    document.getElementById('card').addEventListener('submit', (ev) => {
-      ev.preventDefault();
-      const f = ev.target;
-      const checks = [['cn', luhn(f.cn.value), 'c.badNum'], ['ce', validExpiry(f.ce.value), 'c.badExp'], ['cv', /^\d{3,4}$/.test(f.cv.value), 'c.badCvc'], ['cm', f.cm.value.trim().length >= 3, 'c.badName']];
-      let ok = true;
-      for (const [k, valid, msg] of checks) {
-        document.getElementById(`e-${k}`).textContent = valid ? '' : t(msg);
-        f[k].setAttribute('aria-invalid', String(!valid));
-        if (!valid) ok = false;
-      }
-      if (!ok) return;
-      f.cn.value = ''; f.cv.value = '';
-      if (CFG.paymentLinkBase) {
-        const u = new URL(CFG.paymentLinkBase); u.searchParams.set('client_reference_id', order.id); location.href = u.href; return;
-      }
-      markPaid(order);
-    });
-  }
 }
 
 function openKaspi() {
@@ -631,18 +616,30 @@ function openKaspi() {
   m.className = 'kaspi-modal';
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', 'Kaspi QR');
   m.innerHTML = `<div class="kaspi-card">
-    <button class="kaspi-x" data-close aria-label="${t('back')}">✕</button>
-    <div class="flex items-center justify-center gap-2"><span class="w-7 h-7 rounded-md flex items-center justify-center text-white text-xs font-extrabold" style="background:#f14635">K</span><span class="font-bold text-ink">Kaspi QR</span></div>
-    <img src="${CFG.kaspiQrImage || 'vendor/kaspi-qr.png'}" alt="Kaspi QR ${esc(CFG.kaspiMerchant || '')}" width="240" height="280" style="width:240px;height:auto;margin:0 auto;display:block;border-radius:12px">
-    <div class="text-center"><p class="text-xs text-sub">${t('c.kaspiAmount')}</p><p class="text-3xl font-extrabold text-ink numeric">${fmtKzt(total)}</p>
-      <p class="text-xs text-sub numeric">${esc(t('c.kaspiComment', { n: order.id }))}</p></div>
-    <ol class="text-left text-sm text-sub space-y-1" style="list-style:decimal;padding-left:20px"><li>${t('c.kaspi1')}</li><li>${t('c.kaspi2', { sum: fmtKzt(total) })}</li><li>${t('c.kaspi3')}</li></ol>
-    <button class="${BTN_PRIMARY}" data-paid>${t('c.payQr')}</button></div>`;
+    <div class="kaspi-head" style="background:${KASPI_RED}">
+      <button class="kaspi-x" data-close aria-label="${t('back')}">✕</button>
+      <div class="flex items-center gap-2 text-white font-bold"><span class="w-7 h-7 rounded-lg bg-white flex items-center justify-center">${kaspiLogo('w-5 h-5')}</span>Kaspi QR</div>
+      <p class="text-white text-xs" style="opacity:.85">${esc(CFG.kaspiMerchant || '')}</p>
+      <p class="text-white text-3xl font-extrabold numeric">${fmtKzt(total)}</p>
+    </div>
+    <div class="p-5 space-y-4">
+      <div class="kaspi-qr"><img src="${CFG.kaspiQrImage || 'vendor/kaspi-qr.png'}" alt="Kaspi QR ${esc(CFG.kaspiMerchant || '')}" width="240" height="274"></div>
+      <div class="grid gap-2 text-xs" style="grid-template-columns:repeat(3,1fr)">
+        ${[t('c.step1'), t('c.step2', { sum: `<span style="white-space:nowrap">${fmtKzt(total)}</span>` }), t('c.step3')].map((x, i) => `<div class="rounded-xl bg-muted p-2.5 text-center"><span class="mx-auto mb-1 w-5 h-5 rounded-full bg-ink text-canvas text-[10px] font-bold flex items-center justify-center">${i + 1}</span><span class="text-sub">${x}</span></div>`).join('')}
+      </div>
+      <p class="text-[11px] text-sub text-center numeric">${esc(t('c.kaspiComment', { n: order.id }))}</p>
+      <div class="flex items-center justify-center gap-2 text-xs font-semibold text-sub"><span class="w-2 h-2 rounded-full pulse-dot" style="background:${KASPI_RED}"></span>${t('c.waiting')}</div>
+      <button class="${BTN_PRIMARY}" data-paid>${icon('check', 'w-4 h-4')} ${t('c.paidArrived')}</button>
+    </div></div>`;
   const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
   m.addEventListener('click', (e) => {
     if (e.target === m || e.target.closest('[data-close]')) close();
-    else if (e.target.closest('[data-paid]')) { close(); markPaid(order); }
+    else if (e.target.closest('[data-paid]')) {
+      const btn = e.target.closest('[data-paid]');
+      btn.disabled = true; btn.innerHTML = t('c.checking');
+      setTimeout(() => { close(); markPaid(order); }, 700);
+    }
   });
   document.addEventListener('keydown', onKey);
   document.body.appendChild(m);
@@ -663,18 +660,39 @@ async function renderTicket(id) {
   const o = getOrders().find((x) => x.id === id);
   if (!o) { shell(`<div class="px-6 pt-16 space-y-4"><p class="text-sm text-sub">${t('t.notFound')}</p><a class="${LOGIN_BTN}" href="#/feed">${t('nav.feed')}</a></div>`, 'orders', { maxw: 'md:max-w-2xl' }); return; }
   const steps = [t('t.paid'), t('t.ready'), t('t.done')];
-  shell(`<div class="px-4 pt-6 pb-6 md:pt-10 space-y-5">
-    <div class="flex items-center gap-3"><button aria-label="${t('back')}" data-action="back" class="w-11 h-11 rounded-full bg-surface border border-line flex items-center justify-center text-ink">${icon('back', 'w-5 h-5')}</button><h2 class="text-2xl font-extrabold text-ink">${t('t.title')}</h2></div>
-    <div class="bg-surface border border-line rounded-[18px] card-shadow p-6 text-center space-y-4">
-      <p class="text-xs font-bold tracking-wide text-sub numeric">${esc(t('t.order', { n: o.id }))}</p>
-      <div class="bg-white rounded-[18px] p-3 mx-auto qr" style="max-width:260px" id="tqr" aria-label="QR">…</div>
-      <p class="text-xs text-sub">${t('t.staff')}</p><p class="text-4xl font-extrabold text-ink numeric" style="letter-spacing:.3em;padding-left:.3em" aria-label="${esc(o.pin)}">${esc(o.pin)}</p>
-      <p class="text-xs text-sub">${t('t.show')}</p>
-      <div class="flex items-center justify-center gap-2 text-xs font-bold">${steps.map((s, i) => `<span class="px-2.5 py-1 rounded-full ${i === 0 ? 'bg-brand text-white' : 'bg-muted text-sub'}">${s}</span>`).join('')}</div></div>
-    <div class="bg-surface border border-line rounded-[18px] p-4 space-y-1">
-      <h3 class="font-bold text-ink">${esc(o.placeName)}</h3><p class="text-sm text-sub">${esc(o.address || '—')} · ${esc(t('city'))}</p>
-      <p class="text-sm text-ink">${esc(o.title)}</p><p class="text-sm text-sub numeric">${esc(t('t.window', { w: o.window }))}</p>
-      <a class="flex items-center gap-1.5 text-sm font-bold text-brand dark:text-emerald-300 min-h-[44px]" target="_blank" rel="noopener noreferrer" href="${esc(twoGisUrl(o.placeName, o.lat, o.lng))}">${icon('nav', 'w-4 h-4')} ${t('l.route')}</a></div></div>`, 'orders', { maxw: 'md:max-w-2xl' });
+  const step = (i) => {
+    const circle = i === 0 ? `<div class="w-8 h-8 rounded-full flex items-center justify-center bg-brand text-white">${icon('check', 'w-4 h-4')}</div>`
+      : i === 1 ? '<div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 border-brand text-brand dark:text-emerald-300">2</div>'
+        : '<div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-muted text-sub">3</div>';
+    return `<div class="flex flex-col items-center gap-1">${circle}<span class="text-[11px] font-semibold ${i < 2 ? 'text-ink' : 'text-sub'}">${steps[i]}</span></div>`;
+  };
+  root.innerHTML = `<main class="mx-auto max-w-[430px] md:max-w-none min-h-dvh bg-canvas relative shadow-2xl md:shadow-none">${headerHtml('orders')}
+    <div class="min-h-dvh md:min-h-0 md:max-w-xl md:mx-auto md:py-8">
+      <div class="flex items-center justify-between px-4 pt-4">
+        <a aria-label="${t('back')}" href="#/orders" class="w-11 h-11 rounded-full bg-surface border border-line flex items-center justify-center text-ink">${icon('x', 'w-5 h-5')}</a>
+        <span class="text-xs font-bold tracking-widest text-sub numeric">${esc(t('t.order', { n: o.id }).toUpperCase())}</span>
+        <a href="https://wa.me/?text=${encodeURIComponent(`CrumbSave ${o.id}`)}" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-brand dark:text-emerald-300 min-h-[44px] flex items-center">${t('t.help')}</a>
+      </div>
+      <div class="p-4 space-y-4">
+        <div class="flex items-center px-2">${step(0)}<div class="flex-1 h-0.5 mx-1 mb-5 bg-brand"></div>${step(1)}<div class="flex-1 h-0.5 mx-1 mb-5 bg-line"></div>${step(2)}</div>
+        <div class="relative bg-surface border border-line rounded-[24px] p-5 space-y-4 card-shadow ticket">
+          <div class="flex items-center justify-between gap-2">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand dark:text-emerald-300"><span class="w-1.5 h-1.5 rounded-full bg-current pulse-dot"></span> ${t('t.canPick')}</span>
+            <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-sub">${kaspiLogo('w-3.5 h-3.5')} Kaspi · <span class="numeric">${fmtKzt(o.price + o.fee)}</span></span>
+          </div>
+          <div><h3 class="text-xl font-extrabold text-ink">${esc(o.placeName)}</h3><p class="text-sm text-sub">${esc(o.address || '—')} · ${esc(t('city'))}</p></div>
+          <div class="flex justify-between items-center gap-3 p-3 rounded-xl bg-muted text-sm"><span class="font-semibold text-ink numeric">${esc(t('t.window', { w: o.window }))}</span><span class="text-sub text-right">${esc(o.title)}</span></div>
+          <div class="ticket-cut"></div>
+          <div class="flex justify-center"><div class="p-3 bg-white rounded-2xl qr" style="width:224px" id="tqr" aria-label="QR">…</div></div>
+          <div class="flex justify-center items-baseline gap-2"><span class="text-sm text-sub">${t('t.staff')}</span><span class="text-2xl font-extrabold text-ink numeric" style="letter-spacing:.3em">${esc(o.pin)}</span></div>
+          <p class="text-center text-xs text-sub">${t('t.show')}</p>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <a href="${esc(twoGisUrl(o.placeName, o.lat, o.lng))}" target="_blank" rel="noopener noreferrer" class="min-h-[48px] rounded-[14px] bg-surface border border-line text-ink font-bold text-sm flex items-center justify-center gap-2">${icon('nav', 'w-4 h-4')} ${t('l.route')}</a>
+          <a href="#/feed" class="min-h-[48px] rounded-[14px] bg-brand hover:bg-brand-hover text-white font-bold text-sm flex items-center justify-center gap-2">${t('t.more')}</a>
+        </div>
+      </div>
+    </div></main>`;
   try { const q = await qrSvg(`CRUMBSAVE|${o.id}|${o.pin}`); const el = document.getElementById('tqr'); if (el) el.innerHTML = q; }
   catch { const el = document.getElementById('tqr'); if (el) el.textContent = o.pin; }
 }

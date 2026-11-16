@@ -120,3 +120,25 @@ html.dark .dark\:text-emerald-300{color:var(--color-emerald-300)}html.dark .dark
 .kaspi-card{position:relative;width:min(400px,100%);max-height:calc(100dvh - 32px);overflow:auto;background:var(--surface);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 20px 50px #0005}
 .kaspi-x{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:999px;background:var(--surface-muted);color:var(--text);font-size:14px}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
+
+/* ---- Kaspi checkout / ticket ---- */
+.kaspi-card{padding:0!important;gap:0!important;overflow:hidden auto}
+.kaspi-head{position:relative;padding:20px 20px 18px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.kaspi-head .kaspi-x{background:#ffffff2e;color:#fff}
+.kaspi-qr{background:#fff;border:1px solid var(--border);border-radius:18px;padding:10px;display:flex;justify-content:center}
+.kaspi-qr img{width:220px;height:auto}
+.kaspi-btn{box-shadow:0 8px 20px #d92d2040;transition:transform .15s,filter .15s}.kaspi-btn:hover{filter:brightness(1.05)}.kaspi-btn:active{transform:scale(.99)}
+.pulse-dot{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.ticket{overflow:visible}
+.ticket-cut{position:relative;border-top:2px dashed var(--border);margin:0 -4px}
+.ticket-cut::before,.ticket-cut::after{content:"";position:absolute;top:-13px;width:24px;height:24px;border-radius:999px;background:var(--bg);border:1px solid var(--border)}
+.ticket-cut::before{left:-34px;clip-path:inset(0 0 0 50%)}.ticket-cut::after{right:-34px;clip-path:inset(0 50% 0 0)}
+.py-3\.5{padding-block:calc(var(--spacing)*3.5)}.px-3{padding-inline:calc(var(--spacing)*3)}.py-2\.5{padding-block:calc(var(--spacing)*2.5)}.p-2\.5{padding:calc(var(--spacing)*2.5)}
+.rounded-xl{border-radius:.75rem}.rounded-2xl{border-radius:1rem}.rounded-lg{border-radius:.5rem}.w-16{width:calc(var(--spacing)*16)}.h-16{height:calc(var(--spacing)*16)}
+.h-0\.5{height:calc(var(--spacing)*.5)}.mx-1{margin-inline:var(--spacing)}.mb-5{margin-bottom:calc(var(--spacing)*5)}.mb-1{margin-bottom:var(--spacing)}.border-2{border-style:solid;border-width:2px}.border-brand{border-color:var(--color-brand)}
+.tracking-widest{letter-spacing:.1em}.text-right{text-align:right}.min-h-\[52px\]{min-height:52px}.min-h-\[48px\]{min-height:48px}.w-1\.5{width:calc(var(--spacing)*1.5)}.h-1\.5{height:calc(var(--spacing)*1.5)}.bg-current{background-color:currentColor}
+.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.w-2{width:calc(var(--spacing)*2)}.h-2{height:calc(var(--spacing)*2)}.w-6{width:calc(var(--spacing)*6)}.h-6{height:calc(var(--spacing)*6)}.rounded-md{border-radius:.375rem}.md\:max-w-xl{}
+@media (width>=48rem){.md\:max-w-xl{max-width:36rem}.md\:rounded-xl{border-radius:.75rem}.md\:bg-transparent{background-color:transparent}.md\:border-0{border-width:0}}
+.bg-line{background-color:var(--color-line)}.items-start{align-items:flex-start}.pb-3\.5{padding-bottom:calc(var(--spacing)*3.5)}.pb-40{padding-bottom:calc(var(--spacing)*40)}
+.rounded-\[24px\]{border-radius:24px}.text-3xl{font-size:1.875rem;line-height:calc(2.25/1.875)}.w-8{width:calc(var(--spacing)*8)}
