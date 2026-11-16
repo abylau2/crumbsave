@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText, addressQuery, nearestAddress,
-} from './lib.js?v=20261116k';
-import { DICT } from './i18n.js?v=20261116k';
+} from './lib.js?v=20261116l';
+import { DICT } from './i18n.js?v=20261116l';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
