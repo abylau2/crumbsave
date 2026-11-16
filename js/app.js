@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, osmUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText,
-} from './lib.js?v=20261116f';
-import { DICT } from './i18n.js?v=20261116f';
+} from './lib.js?v=20261116g';
+import { DICT } from './i18n.js?v=20261116g';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -629,16 +629,26 @@ function openKaspi() {
       </div>
       <p class="text-[11px] text-sub text-center numeric">${esc(t('c.kaspiComment', { n: order.id }))}</p>
       <div class="flex items-center justify-center gap-2 text-xs font-semibold text-sub"><span class="w-2 h-2 rounded-full pulse-dot" style="background:${KASPI_RED}"></span>${t('c.waiting')}</div>
-      <button class="${BTN_PRIMARY}" data-paid>${icon('check', 'w-4 h-4')} ${t('c.paidArrived')}</button>
+      <button class="${BTN_PRIMARY}" data-paid>${t('c.paidArrived')}</button>
     </div></div>`;
   const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
   m.addEventListener('click', (e) => {
     if (e.target === m || e.target.closest('[data-close]')) close();
     else if (e.target.closest('[data-paid]')) {
-      const btn = e.target.closest('[data-paid]');
-      btn.disabled = true; btn.innerHTML = t('c.checking');
-      setTimeout(() => { close(); markPaid(order); }, 700);
+      const card = m.querySelector('.kaspi-card');
+      card.innerHTML = `<div class="pay-status" role="status" aria-live="polite">
+        <div class="pay-anim"><svg viewBox="0 0 80 80" aria-hidden="true"><circle class="pay-ring" cx="40" cy="40" r="34"/><path class="pay-tick" d="M25 41l10 10 20-22"/></svg></div>
+        <p class="pay-title">${t('c.processing')}</p>
+        <p class="pay-sub numeric">${fmtKzt(total)} · Kaspi · ${esc(CFG.kaspiMerchant || '')}</p></div>`;
+      const st = card.querySelector('.pay-status');
+      setTimeout(() => {
+        st.classList.add('done');
+        st.querySelector('.pay-title').textContent = t('c.success');
+        if (navigator.vibrate) navigator.vibrate(30);
+      }, 1800);
+      setTimeout(() => { close(); markPaid(order); }, 3300);
+      m.onclick = null; m.style.pointerEvents = 'none';
     }
   });
   document.addEventListener('keydown', onKey);

@@ -142,3 +142,19 @@ html.dark .dark\:text-emerald-300{color:var(--color-emerald-300)}html.dark .dark
 @media (width>=48rem){.md\:max-w-xl{max-width:36rem}.md\:rounded-xl{border-radius:.75rem}.md\:bg-transparent{background-color:transparent}.md\:border-0{border-width:0}}
 .bg-line{background-color:var(--color-line)}.items-start{align-items:flex-start}.pb-3\.5{padding-bottom:calc(var(--spacing)*3.5)}.pb-40{padding-bottom:calc(var(--spacing)*40)}
 .rounded-\[24px\]{border-radius:24px}.text-3xl{font-size:1.875rem;line-height:calc(2.25/1.875)}.w-8{width:calc(var(--spacing)*8)}
+
+/* ---- анимация оплаты ---- */
+.pay-status{padding:44px 24px 40px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.pay-anim{width:96px;height:96px;margin-bottom:8px}
+.pay-anim svg{width:100%;height:100%;overflow:visible}
+.pay-ring{fill:none;stroke:var(--color-brand);stroke-width:5;stroke-linecap:round;stroke-dasharray:160 54;transform-origin:40px 40px;animation:pay-spin .9s linear infinite}
+.pay-tick{fill:none;stroke:#fff;stroke-width:6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:50;stroke-dashoffset:50}
+.pay-title{font-size:20px;font-weight:800;color:var(--text)}
+.pay-sub{font-size:13px;color:var(--color-sub)}
+.pay-status.done .pay-ring{animation:none;stroke-dasharray:none;fill:var(--color-brand);animation:pay-pop .45s cubic-bezier(.2,1.4,.4,1)}
+.pay-status.done .pay-tick{animation:pay-draw .4s .2s ease-out forwards}
+.pay-status.done .pay-title{animation:pay-up .35s ease-out}
+@keyframes pay-spin{to{transform:rotate(360deg)}}
+@keyframes pay-pop{0%{transform:scale(.7)}100%{transform:scale(1)}}
+@keyframes pay-draw{to{stroke-dashoffset:0}}
+@keyframes pay-up{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
