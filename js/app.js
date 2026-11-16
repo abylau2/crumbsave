@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText, addressQuery, nearestAddress,
-} from './lib.js?v=20261116n';
-import { DICT } from './i18n.js?v=20261116n';
+} from './lib.js?v=20261116o';
+import { DICT } from './i18n.js?v=20261116o';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -437,7 +437,8 @@ function cityRow(withSearch) {
 function renderFeed() {
   const cats = ['all', 'bakery', 'ready', 'groceries'];
   const q = state.q.trim().toLowerCase();
-  const list = state.places.filter((p) => (state.cat === 'all' || p.cat === state.cat) && (!q || p.name.toLowerCase().includes(q)));
+  const list = state.places.filter((p) => (state.cat === 'all' || p.cat === state.cat) && (!q || p.name.toLowerCase().includes(q)))
+    .map((p, i) => ({ p, i, out: offerFor(p).left === 0 ? 1 : 0 })).sort((a, b) => a.out - b.out || a.i - b.i).map((x) => x.p);
   let body;
   if (state.status === 'loading' || state.status === 'idle') body = `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 md:gap-5">${skeletonCards()}</div>`;
   else if (state.status === 'error') body = `<div class="bg-urgent-soft text-urgent rounded-[18px] p-4 text-sm font-semibold flex items-center justify-between gap-3" role="alert"><span>${t('load.error')}</span><button class="h-9 px-4 rounded-full bg-surface text-ink border border-line" data-action="retry">${t('retry')}</button></div>`;
