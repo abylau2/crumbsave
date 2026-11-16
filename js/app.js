@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText, addressQuery, nearestAddress,
-} from './lib.js?v=20261116j';
-import { DICT } from './i18n.js?v=20261116j';
+} from './lib.js?v=20261116k';
+import { DICT } from './i18n.js?v=20261116k';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -315,6 +315,13 @@ function shell(inner, active, { maxw = 'md:max-w-6xl', nav = true } = {}) {
 
 const isFav = (id) => getFavs().includes(id);
 
+function fmtMins(m) { return m >= 60 ? t('time.hm', { h: Math.floor(m / 60), m: String(m % 60).padStart(2, '0') }) : t('time.m', { m }); }
+function timeText(o) {
+  if (o.minsLeft != null && o.open) return t('time.left', { t: fmtMins(o.minsLeft), c: o.closes });
+  return o.window;
+}
+function soonCls(o) { return o.minsLeft != null && o.open && o.minsLeft <= 60 ? 'text-urgent font-semibold' : 'text-sub'; }
+
 function placeCard(p, eager) {
   const o = offerFor(p);
   const lowCls = o.left <= 1 ? 'bg-urgent-soft text-urgent' : 'bg-surface/95 text-ink';
@@ -337,7 +344,7 @@ function placeCard(p, eager) {
         </div>
         <p class="text-sm text-ink">${esc(o.title)}</p>
         <div class="flex items-end justify-between">
-          <div class="flex items-center gap-1.5 text-xs text-sub">${icon('clock', 'w-3.5 h-3.5')}<span class="numeric">${esc(o.window)}</span></div>
+          <div class="flex items-center gap-1.5 text-xs ${soonCls(o)}">${icon('clock', 'w-3.5 h-3.5')}<span class="numeric">${esc(timeText(o))}</span></div>
           <div class="flex items-center gap-2">
             <span class="px-1.5 py-0.5 rounded-md bg-brand-soft text-brand dark:text-emerald-300 text-[11px] font-bold">−${o.discount}%</span>
             <div class="flex flex-col items-end leading-tight"><del class="text-[11px] text-sub numeric">${fmtKzt(o.ref)}</del><span class="text-base font-extrabold text-ink numeric">${fmtKzt(o.price)}</span></div>

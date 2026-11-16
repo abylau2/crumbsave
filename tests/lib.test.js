@@ -117,3 +117,15 @@ test('photo theme follows cuisine and name', () => {
   assert.equal(photoTheme({ id: 'n1', cat: 'ready', kind: 'Ресторан', name: 'X', cuisine: 'pizza' }), 'pizza');
   assert.equal(photoTheme({ id: 'n1', cat: 'groceries', kind: 'Супермаркет', name: 'Magnum' }), 'groceries');
 });
+
+test('окно выдачи — перед закрытием в 22:00 или 23:00', () => {
+  const now = new Date(2026, 10, 16, 20, 2);
+  const closes = new Set();
+  for (let i = 0; i < 200; i += 1) {
+    const o = demoOffer({ id: `n${i}`, cat: 'ready' }, now);
+    closes.add(o.closes);
+    assert.equal(o.day, 'Сегодня');
+    assert.ok(o.minsLeft > 0 && o.minsLeft <= 180);
+  }
+  assert.deepEqual([...closes].sort(), ['22:00', '23:00']);
+});

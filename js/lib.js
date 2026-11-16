@@ -209,19 +209,23 @@ export function demoOffer(place, now = new Date(), sold = 0) {
   const h = hash32(place.id);
   const tiers = TIERS[place.cat] || TIERS.ready;
   const [title, ref, price] = tiers[h % tiers.length];
-  const startMin = 17 * 60 + 30 + (((h >>> 3) % 7) * 30); // 17:30 … 20:30
+  // Закрытие: по умолчанию 23:00, примерно у 40% заведений — 22:00.
+  // Выдача — последние 60–90 минут перед закрытием.
+  const closeMin = ((h >>> 5) % 5) < 2 ? 22 * 60 : 23 * 60;
+  const startMin = closeMin - ((h >>> 7) % 2 ? 90 : 60);
   const mk = (addDays) => {
     const s = new Date(now);
     s.setHours(0, 0, 0, 0);
     s.setDate(s.getDate() + addDays);
     s.setMinutes(startMin);
-    const e = new Date(s.getTime() + 75 * 60000);
+    const e = new Date(s.getTime() + (closeMin - startMin) * 60000);
     return { s, e };
   };
   let { s, e } = mk(0);
   let day = 'Сегодня';
   if (e <= now) { ({ s, e } = mk(1)); day = 'Завтра'; }
   const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const minsLeft = day === 'Сегодня' ? Math.max(0, Math.round((e - now) / 60000)) : null;
   const total = 1 + ((h >>> 9) % 5);
   const left = Math.max(0, total - sold);
   return {
@@ -233,6 +237,9 @@ export function demoOffer(place, now = new Date(), sold = 0) {
     left,
     day,
     window: `${day} ${hhmm(s)}–${hhmm(e)}`,
+    closes: hhmm(e),
+    minsLeft,
+    open: day === 'Сегодня' && now >= s,
     start: s.toISOString(),
     end: e.toISOString(),
     demo: true,
