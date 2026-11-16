@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, osmUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText,
-} from './lib.js?v=20261116b';
-import { DICT } from './i18n.js?v=20261116b';
+} from './lib.js?v=20261116c';
+import { DICT } from './i18n.js?v=20261116c';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -548,7 +548,7 @@ async function renderCheckout(id) {
   const total = order.price + order.fee;
   const payUrl = `${location.origin}${location.pathname}#/pay/${b64urlEncode(packOrder(order))}`;
   const method = sess.get('cs_paytab', 'qr');
-  const test = CFG.paymentLinkBase ? '' : `<div class="rounded-[14px] bg-urgent-soft text-urgent text-xs font-semibold p-3">${t('c.test')}</div>`;
+  const test = (method === 'qr' ? CFG.kaspiQrUrl : CFG.paymentLinkBase) ? '' : `<div class="rounded-[14px] bg-urgent-soft text-urgent text-xs font-semibold p-3">${t('c.test')}</div>`;
   const opt = (m, title, sub) => `<button data-tab="${m}" role="radio" aria-checked="${method === m}" class="w-full flex items-center justify-between gap-3 p-4 rounded-[14px] border text-left transition ${method === m ? 'border-brand bg-brand-soft' : 'border-line bg-surface'}"><span><span class="block text-sm font-bold text-ink">${title}</span><span class="block text-xs text-sub">${sub}</span></span><span class="text-xs font-bold text-brand dark:text-emerald-300">${t('c.zeroFee')}</span></button>`;
   root.innerHTML = `<main class="mx-auto max-w-[430px] md:max-w-none min-h-dvh bg-canvas relative shadow-2xl md:shadow-none">${headerHtml('feed')}
     <div class="min-h-dvh md:min-h-0 p-5 space-y-5 md:max-w-2xl md:mx-auto md:py-8">
@@ -562,7 +562,7 @@ async function renderCheckout(id) {
           <div class="flex justify-between"><span class="text-sub">${t('c.fee')}</span><span class="numeric text-ink">${fmtKzt(order.fee)}</span></div>
           ${order.ref ? `<div class="flex justify-between"><span class="text-sub">${t('c.saving')}</span><span class="numeric text-brand dark:text-emerald-300 font-semibold">${fmtKzt(order.ref - order.price)}</span></div>` : ''}
           <div class="flex justify-between font-extrabold text-base border-t border-line pt-2"><span class="text-ink">${t('c.total')}</span><span class="numeric text-ink">${fmtKzt(total)}</span></div></div></div>
-      <div class="space-y-3"><h3 class="font-bold text-ink">${t('c.method')}</h3><div role="radiogroup" class="space-y-2">${opt('qr', t('c.qr'), t('c.qrSub'))}${opt('card', t('c.card'), t('c.cardSub'))}</div></div>
+      <div class="space-y-3"><h3 class="font-bold text-ink">${t('c.method')}</h3><div role="radiogroup" class="space-y-2">${opt('qr', CFG.kaspiQrUrl ? 'Kaspi QR' : t('c.qr'), CFG.kaspiQrUrl ? t('c.kaspiSub') : t('c.qrSub'))}${opt('card', t('c.card'), t('c.cardSub'))}</div></div>
       ${test}
       <div id="pay-body" class="space-y-3"></div>
       <p class="text-[11px] text-sub text-center">${t('c.offer')}</p>
@@ -582,7 +582,20 @@ async function renderCheckout(id) {
   };
   clearInterval(timer); tick(); timer = setInterval(tick, 1000);
   const body = document.getElementById('pay-body');
-  if (method === 'qr') {
+  if (method === 'qr' && CFG.kaspiQrUrl) {
+    body.innerHTML = `<div class="bg-surface border border-line rounded-[18px] card-shadow p-5 space-y-4 text-center">
+        <div class="flex items-center justify-center gap-2"><span class="w-7 h-7 rounded-md flex items-center justify-center text-white text-xs font-extrabold" style="background:#f14635">K</span><span class="font-bold text-ink">Kaspi QR · ${esc(CFG.kaspiMerchant || '')}</span></div>
+        <div class="bg-white rounded-[18px] border border-line p-3 mx-auto qr" style="max-width:260px" id="qr" aria-label="Kaspi QR">…</div>
+        <div><p class="text-xs text-sub">${t('c.kaspiAmount')}</p><p class="text-3xl font-extrabold text-ink numeric">${fmtKzt(total)}</p>
+          <p class="text-xs text-sub numeric">${esc(t('c.kaspiComment', { n: order.id }))}</p></div>
+        <ol class="text-left text-sm text-sub space-y-1" style="list-style:decimal;padding-left:20px"><li>${t('c.kaspi1')}</li><li>${t('c.kaspi2', { sum: fmtKzt(total) })}</li><li>${t('c.kaspi3')}</li></ol>
+        <a class="${BTN_PRIMARY}" style="background:#f14635" href="${esc(CFG.kaspiQrUrl)}" target="_blank" rel="noopener noreferrer">${t('c.kaspiOpen')}</a>
+      </div>
+      <button class="w-full min-h-[50px] rounded-[14px] border border-line bg-surface text-ink font-bold text-sm" data-action="confirm-qr">${t('c.payQr')}</button>
+      <p class="text-[11px] text-sub text-center">${t('c.kaspiNote')}</p>`;
+    try { document.getElementById('qr').innerHTML = await qrSvg(CFG.kaspiQrUrl, 'M'); }
+    catch { const q = document.getElementById('qr'); if (q) q.textContent = CFG.kaspiQrUrl; }
+  } else if (method === 'qr') {
     body.innerHTML = `<p class="text-xs text-sub">${t('c.qrHint')}</p>
       <div class="bg-white rounded-[18px] border border-line p-3 mx-auto qr" style="max-width:280px" id="qr" aria-label="QR">…</div>
       <p class="text-xs text-sub text-center numeric">${esc(t('t.order', { n: order.id }))}</p>
