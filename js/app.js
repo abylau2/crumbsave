@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, osmUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText,
-} from './lib.js?v=20261116d';
-import { DICT } from './i18n.js?v=20261116d';
+} from './lib.js?v=20261116e';
+import { DICT } from './i18n.js?v=20261116e';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -583,9 +583,7 @@ async function renderCheckout(id) {
   clearInterval(timer); tick(); timer = setInterval(tick, 1000);
   const body = document.getElementById('pay-body');
   if (method === 'qr' && CFG.kaspiQrUrl) {
-    body.innerHTML = `<a class="${BTN_PRIMARY}" style="background:#f14635" href="${esc(CFG.kaspiQrUrl)}" target="_blank" rel="noopener noreferrer" data-kaspi>${t('c.kaspiOpen')} · ${fmtKzt(total)}</a>
-      <p class="text-xs text-sub text-center numeric">${esc(t('c.kaspiComment', { n: order.id }))}</p>
-      <button class="w-full min-h-[50px] rounded-[14px] border border-line bg-surface text-ink font-bold text-sm" data-action="confirm-qr">${t('c.payQr')}</button>`;
+    body.innerHTML = `<button class="${BTN_PRIMARY}" style="background:#f14635" data-action="kaspi">${t('c.kaspiOpen')} · ${fmtKzt(total)}</button>`;
   } else if (method === 'qr') {
     body.innerHTML = `<p class="text-xs text-sub">${t('c.qrHint')}</p>
       <div class="bg-white rounded-[18px] border border-line p-3 mx-auto qr" style="max-width:280px" id="qr" aria-label="QR">…</div>
@@ -623,6 +621,32 @@ async function renderCheckout(id) {
       markPaid(order);
     });
   }
+}
+
+function openKaspi() {
+  const order = sess.get('cs_draft', null);
+  if (!order) return;
+  const total = order.price + order.fee;
+  const m = document.createElement('div');
+  m.className = 'kaspi-modal';
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', 'Kaspi QR');
+  m.innerHTML = `<div class="kaspi-card">
+    <button class="kaspi-x" data-close aria-label="${t('back')}">✕</button>
+    <div class="flex items-center justify-center gap-2"><span class="w-7 h-7 rounded-md flex items-center justify-center text-white text-xs font-extrabold" style="background:#f14635">K</span><span class="font-bold text-ink">Kaspi QR</span></div>
+    <img src="${CFG.kaspiQrImage || 'vendor/kaspi-qr.png'}" alt="Kaspi QR ${esc(CFG.kaspiMerchant || '')}" width="240" height="280" style="width:240px;height:auto;margin:0 auto;display:block;border-radius:12px">
+    <div class="text-center"><p class="text-xs text-sub">${t('c.kaspiAmount')}</p><p class="text-3xl font-extrabold text-ink numeric">${fmtKzt(total)}</p>
+      <p class="text-xs text-sub numeric">${esc(t('c.kaspiComment', { n: order.id }))}</p></div>
+    <ol class="text-left text-sm text-sub space-y-1" style="list-style:decimal;padding-left:20px"><li>${t('c.kaspi1')}</li><li>${t('c.kaspi2', { sum: fmtKzt(total) })}</li><li>${t('c.kaspi3')}</li></ol>
+    <button class="${BTN_PRIMARY}" data-paid>${t('c.payQr')}</button></div>`;
+  const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  m.addEventListener('click', (e) => {
+    if (e.target === m || e.target.closest('[data-close]')) close();
+    else if (e.target.closest('[data-paid]')) { close(); markPaid(order); }
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(m);
+  m.querySelector('[data-paid]').focus();
 }
 
 function markPaid(order) {
@@ -695,6 +719,7 @@ function route() {
   const view = name || 'feed';
   if (mapInst) { mapInst.remove(); mapInst = null; }
   if (view !== 'checkout') clearInterval(timer);
+  document.querySelector('.kaspi-modal')?.remove();
   if (view === 'feed') { renderFeed(); init(); }
   else if (view === 'map') renderMap();
   else if (view === 'place') renderPlace(arg);
@@ -743,6 +768,7 @@ root.addEventListener('click', async (e) => {
       break;
     }
     case 'book': if (requireLogin(`#/checkout/${d.id}`)) location.hash = `#/checkout/${d.id}`; break;
+    case 'kaspi': openKaspi(); break;
     case 'confirm-qr': { const dr = sess.get('cs_draft', null); if (dr) markPaid(dr); break; }
     case 'logout': store.del('cs_user'); route(); break;
     case 'theme': store.set('cs_dark', !store.get('cs_dark', false)); applyTheme(); route(); break;
