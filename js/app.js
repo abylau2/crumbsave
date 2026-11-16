@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, osmUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText,
-} from './lib.js?v=20261116c';
-import { DICT } from './i18n.js?v=20261116c';
+} from './lib.js?v=20261116d';
+import { DICT } from './i18n.js?v=20261116d';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -583,18 +583,9 @@ async function renderCheckout(id) {
   clearInterval(timer); tick(); timer = setInterval(tick, 1000);
   const body = document.getElementById('pay-body');
   if (method === 'qr' && CFG.kaspiQrUrl) {
-    body.innerHTML = `<div class="bg-surface border border-line rounded-[18px] card-shadow p-5 space-y-4 text-center">
-        <div class="flex items-center justify-center gap-2"><span class="w-7 h-7 rounded-md flex items-center justify-center text-white text-xs font-extrabold" style="background:#f14635">K</span><span class="font-bold text-ink">Kaspi QR · ${esc(CFG.kaspiMerchant || '')}</span></div>
-        <div class="bg-white rounded-[18px] border border-line p-3 mx-auto qr" style="max-width:260px" id="qr" aria-label="Kaspi QR">…</div>
-        <div><p class="text-xs text-sub">${t('c.kaspiAmount')}</p><p class="text-3xl font-extrabold text-ink numeric">${fmtKzt(total)}</p>
-          <p class="text-xs text-sub numeric">${esc(t('c.kaspiComment', { n: order.id }))}</p></div>
-        <ol class="text-left text-sm text-sub space-y-1" style="list-style:decimal;padding-left:20px"><li>${t('c.kaspi1')}</li><li>${t('c.kaspi2', { sum: fmtKzt(total) })}</li><li>${t('c.kaspi3')}</li></ol>
-        <a class="${BTN_PRIMARY}" style="background:#f14635" href="${esc(CFG.kaspiQrUrl)}" target="_blank" rel="noopener noreferrer">${t('c.kaspiOpen')}</a>
-      </div>
-      <button class="w-full min-h-[50px] rounded-[14px] border border-line bg-surface text-ink font-bold text-sm" data-action="confirm-qr">${t('c.payQr')}</button>
-      <p class="text-[11px] text-sub text-center">${t('c.kaspiNote')}</p>`;
-    try { document.getElementById('qr').innerHTML = await qrSvg(CFG.kaspiQrUrl, 'M'); }
-    catch { const q = document.getElementById('qr'); if (q) q.textContent = CFG.kaspiQrUrl; }
+    body.innerHTML = `<a class="${BTN_PRIMARY}" style="background:#f14635" href="${esc(CFG.kaspiQrUrl)}" target="_blank" rel="noopener noreferrer" data-kaspi>${t('c.kaspiOpen')} · ${fmtKzt(total)}</a>
+      <p class="text-xs text-sub text-center numeric">${esc(t('c.kaspiComment', { n: order.id }))}</p>
+      <button class="w-full min-h-[50px] rounded-[14px] border border-line bg-surface text-ink font-bold text-sm" data-action="confirm-qr">${t('c.payQr')}</button>`;
   } else if (method === 'qr') {
     body.innerHTML = `<p class="text-xs text-sub">${t('c.qrHint')}</p>
       <div class="bg-white rounded-[18px] border border-line p-3 mx-auto qr" style="max-width:280px" id="qr" aria-label="QR">…</div>
