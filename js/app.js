@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText, addressQuery, nearestAddress,
-} from './lib.js?v=20261116o';
-import { DICT } from './i18n.js?v=20261116o';
+} from './lib.js?v=20261123b';
+import { DICT, LIB } from './i18n.js?v=20261123b';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -31,6 +31,12 @@ function t(key, vars) {
   let s = DICT[lang]?.[key] ?? DICT.ru[key] ?? key;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
   return s;
+}
+// Перевод текстов из lib.js; «Сегодня 21:00–22:00» → «Today 21:00–22:00».
+function tr(str) {
+  const m = LIB[lang]; if (!m || !str) return str || '';
+  if (m[str]) return m[str];
+  return String(str).replace(/^(Сегодня|Завтра)(?=\s)/, (w) => m[w] || w);
 }
 function setLang(l) {
   lang = l; store.set('cs_lang', l);
@@ -353,7 +359,7 @@ const isFav = (id) => getFavs().includes(id);
 function fmtMins(m) { return m >= 60 ? t('time.hm', { h: Math.floor(m / 60), m: String(m % 60).padStart(2, '0') }) : t('time.m', { m }); }
 function timeText(o) {
   if (o.minsLeft != null && o.open) return t('time.left', { t: fmtMins(o.minsLeft), c: o.closes });
-  return o.window;
+  return tr(o.window);
 }
 function soonCls(o) { return o.minsLeft != null && o.open && o.minsLeft <= 60 ? 'text-urgent font-semibold' : 'text-sub'; }
 
@@ -364,7 +370,7 @@ function placeCard(p, eager) {
   return `<div class="relative bg-surface rounded-[18px] border border-line card-shadow overflow-hidden md:hover:-translate-y-0.5 md:hover:shadow-lg transition">
     <a class="block" href="#/place/${esc(p.id)}">
       <div class="relative aspect-[16/10] bg-muted">
-        <img alt="${esc(o.title)}" class="w-full h-full object-cover" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" width="640" height="400" src="${esc(photoFor(p))}">
+        <img alt="${esc(tr(o.title))}" class="w-full h-full object-cover" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" width="640" height="400" src="${esc(photoFor(p))}">
         <span class="absolute left-3 bottom-3 px-2.5 py-1 rounded-full text-[11px] font-bold ${lowCls}">${esc(leftText(o.left))}</span>
         <span class="absolute left-3 top-2 mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-ink text-canvas">${t('demo')}</span>
       </div>
@@ -374,10 +380,10 @@ function placeCard(p, eager) {
           <div class="min-w-0">
             <div class="flex items-center gap-2"><h4 class="font-bold text-[15px] text-ink truncate">${esc(p.name)}</h4>
               ${p.distance != null ? `<span class="flex items-center gap-0.5 text-xs font-semibold text-ink shrink-0">${icon('pin', 'w-3 h-3')} ${esc(fmtDist(p.distance))}</span>` : ''}</div>
-            <p class="text-xs text-sub truncate">${esc(p.kind)}${p.address ? ` · ${esc(p.address)}` : ''}</p>
+            <p class="text-xs text-sub truncate">${esc(tr(p.kind))}${p.address ? ` · ${esc(p.address)}` : ''}</p>
           </div>
         </div>
-        <p class="text-sm text-ink">${esc(o.title)}</p>
+        <p class="text-sm text-ink">${esc(tr(o.title))}</p>
         <div class="flex items-end justify-between">
           <div class="flex items-center gap-1.5 text-xs ${soonCls(o)}">${icon('clock', 'w-3.5 h-3.5')}<span class="numeric">${esc(timeText(o))}</span></div>
           <div class="flex items-center gap-2">
@@ -399,7 +405,7 @@ function skeletonCards(n = 6) {
 function locLabel() {
   if (state.source === 'gps') return t('near');
   if (state.source === 'ip') return t('near.approx');
-  if (state.source === 'district') return state.district;
+  if (state.source === 'district') return tr(state.district);
   return t('city');
 }
 function geoMsgHtml() {
@@ -418,7 +424,7 @@ function geoPopHtml() {
     <div class="flex gap-2 px-3 pb-2">${[1000, 2000, 3000, 5000].map((r) => `<button data-radius="${r}" style="width:auto;padding:6px 12px" class="rounded-full border ${r === state.radius ? 'bg-ink text-canvas border-ink' : 'border-line'}">${r / 1000} ${t('km')}</button>`).join('')}</div>
     <hr>
     <div class="px-3 pt-1 pb-1 text-xs text-sub font-semibold">${t('geo.districts')}</div>
-    ${DISTRICTS.map((d) => `<button data-district="${esc(d.id)}">${icon('pin', 'w-4 h-4 text-sub')}<span>${d.id === 'center' ? t('geo.center') : esc(d.id)}</span></button>`).join('')}
+    ${DISTRICTS.map((d) => `<button data-district="${esc(d.id)}">${icon('pin', 'w-4 h-4 text-sub')}<span>${d.id === 'center' ? t('geo.center') : esc(tr(d.id))}</span></button>`).join('')}
   </div>`;
 }
 function cityRow(withSearch) {
@@ -460,10 +466,39 @@ function renderFeed() {
   if (qi && state.searchOpen) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
 }
 
+// Прямая ссылка на набор в новом браузере: заведения ещё нет в памяти — загружаем его по номеру из OpenStreetMap.
+const placeLookups = {};
+function fetchPlaceById(id) {
+  const m = /^([nwr])(\d+)$/.exec(id || '');
+  if (!m) return Promise.resolve(null);
+  if (!placeLookups[id]) {
+    const type = { n: 'node', w: 'way', r: 'relation' }[m[1]];
+    placeLookups[id] = overpassRace(`[out:json][timeout:20];${type}(id:${m[2]});out center tags;`, { timeout: 20000 })
+      .then((els) => {
+        const [p] = parseElements(els, state.loc || ALMATY);
+        if (p) { applyAddr([p]); rememberPlaces([p]); persistPlace(p); }
+        return p || null;
+      })
+      .catch(() => { delete placeLookups[id]; return undefined; });
+  }
+  return placeLookups[id];
+}
+function placeMissing(id) {
+  const myHash = location.hash;
+  shell(`<div class="px-6 pt-16 md:pt-10 space-y-4" role="status"><div class="h-8 skel rounded-md" style="width:60%"></div><p class="text-sm text-sub">${t('l.loading')}</p></div>`, 'feed', { maxw: 'md:max-w-2xl' });
+  fetchPlaceById(id).then((p) => {
+    if (location.hash !== myHash) return;
+    if (p) { route(); return; }
+    const msg = p === null ? t('l.notFound') : t('load.error');
+    shell(`<div class="px-6 pt-16 md:pt-10 space-y-4"><h3 class="text-xl font-bold text-ink">${msg}</h3>
+      <div class="flex gap-3 flex-wrap">${p === undefined ? `<button class="${LOGIN_BTN}" data-action="reload">${t('retry')}</button>` : ''}<a class="${LOGIN_BTN}" href="#/feed">${t('nav.feed')}</a></div></div>`, 'feed', { maxw: 'md:max-w-2xl' });
+  });
+}
+
 const INSIDE = { bakery: 'l.insideText.bakery', ready: 'l.insideText.ready', groceries: 'l.insideText.groceries' };
 function renderPlace(id) {
   const p = findPlace(id);
-  if (!p) { location.hash = '#/feed'; return; }
+  if (!p) { placeMissing(id); return; }
   enrichPlaceAddress(p);
   const o = offerFor(p);
   const phone = p.phone ? p.phone.replace(/[^\d+]/g, '') : '';
@@ -472,7 +507,7 @@ function renderPlace(id) {
     ${headerHtml('feed')}
     <div class="min-h-dvh md:min-h-0 flex flex-col md:grid md:grid-cols-[1.1fr_1fr] md:gap-10 md:items-start md:max-w-6xl md:mx-auto md:px-6 md:py-8">
       <div class="relative h-[260px] md:h-[520px] bg-muted md:rounded-[28px] md:overflow-hidden md:sticky md:top-24">
-        <img alt="${esc(o.title)}" class="w-full h-full object-cover" fetchpriority="high" decoding="async" src="${esc(photoFor(p, 1000))}">
+        <img alt="${esc(tr(o.title))}" class="w-full h-full object-cover" fetchpriority="high" decoding="async" src="${esc(photoFor(p, 1000))}">
         <div class="absolute inset-x-0 top-0 p-4 flex justify-between">
           <button aria-label="${t('back')}" data-action="back" class="w-11 h-11 rounded-full bg-surface/95 text-ink flex items-center justify-center shadow">${icon('back', 'w-5 h-5')}</button>
           <div class="flex gap-2">
@@ -484,14 +519,14 @@ function renderPlace(id) {
       <div class="flex-1 pb-32 md:pb-0">
         <div class="p-5 md:p-0 space-y-5">
           <div class="space-y-1.5">
-            <div class="flex items-center gap-1.5 text-sm text-sub"><span class="font-semibold text-ink">${esc(p.name)}</span>·<span>${esc(p.kind)}</span>${p.distance != null ? `·<span class="flex items-center gap-0.5">${icon('pin', 'w-3 h-3')} ${esc(fmtDist(p.distance))}</span>` : ''}</div>
-            <h2 class="text-2xl md:text-4xl font-extrabold text-ink">${esc(o.title)}</h2>
+            <div class="flex items-center gap-1.5 text-sm text-sub"><span class="font-semibold text-ink">${esc(p.name)}</span>·<span>${esc(tr(p.kind))}</span>${p.distance != null ? `·<span class="flex items-center gap-0.5">${icon('pin', 'w-3 h-3')} ${esc(fmtDist(p.distance))}</span>` : ''}</div>
+            <h2 class="text-2xl md:text-4xl font-extrabold text-ink">${esc(tr(o.title))}</h2>
             <p class="flex items-center gap-1 text-sm text-sub">${icon('pin', 'w-4 h-4 shrink-0')} ${p.address ? esc(p.address) : esc(addrCache[p.id] ? t('city') : t('l.addrLoading'))}</p>
             <p class="text-sm font-semibold text-sub">${esc(leftText(o.left))} · <span class="text-urgent">${t('demo')}</span></p>
           </div>
           <div class="flex items-center justify-between p-4 rounded-[18px] bg-brand-soft">
             <div><span class="text-xs font-semibold uppercase tracking-wide text-brand dark:text-emerald-300">${t('l.pickup')}</span>
-              <p class="text-lg font-bold text-ink numeric">${esc(o.window.replace(' ', ', '))}</p><p class="text-xs text-sub">${t('l.pickupHint')}</p></div>
+              <p class="text-lg font-bold text-ink numeric">${esc(tr(o.window).replace(' ', ', '))}</p><p class="text-xs text-sub">${t('l.pickupHint')}</p></div>
             ${icon('clock', 'w-7 h-7 text-brand dark:text-emerald-300')}
           </div>
           <div><h4 class="font-bold text-ink mb-1">${t('l.inside')}</h4><p class="text-sm text-sub leading-relaxed">${t(INSIDE[p.cat] || INSIDE.ready)}</p></div>
@@ -557,9 +592,9 @@ async function renderMap() {
     if (!marker) marker = L.marker([p.lat, p.lng], { icon: L.divIcon({ html: pill, className: '', iconSize: null, iconAnchor: [14, 14] }), zIndexOffset: 1000 - idx }).addTo(mapInst);
     const box = document.createElement('div'); box.className = 'space-y-1 min-w-[180px]';
     const a = document.createElement('a'); a.className = 'font-bold'; a.href = `#/place/${p.id}`; a.textContent = p.name;
-    const ad = document.createElement('div'); ad.className = 'text-xs'; ad.textContent = p.address || p.kind;
+    const ad = document.createElement('div'); ad.className = 'text-xs'; ad.textContent = p.address || tr(p.kind);
     const ol = document.createElement('a'); ol.className = 'block text-xs'; ol.href = `#/place/${p.id}`;
-    ol.append(document.createTextNode(`${o.title} — `)); const b = document.createElement('b'); b.textContent = fmtKzt(o.price); ol.append(b);
+    ol.append(document.createTextNode(`${tr(o.title)} — `)); const b = document.createElement('b'); b.textContent = fmtKzt(o.price); ol.append(b);
     box.append(a, ad, ol);
     marker.bindPopup(box);
     pts.push([p.lat, p.lng]);
@@ -637,9 +672,9 @@ function renderOrders() {
     const orders = getOrders();
     inner = orders.length ? `<div class="px-4 pb-6 space-y-3"><h3 class="text-sm font-semibold text-sub">${t('o.active')}</h3>${orders.map((o) => `
       <a href="#/ticket/${esc(o.id)}" class="block bg-surface border border-line rounded-[18px] p-4 card-shadow space-y-1">
-        <div class="flex items-center justify-between"><h4 class="font-bold text-ink">${esc(o.placeName)}</h4><span class="text-xs font-bold text-brand dark:text-emerald-300">${t('t.paid')}</span></div>
-        <p class="text-sm text-ink">${esc(o.title)}</p>
-        <p class="text-xs text-sub numeric">${esc(o.window)} · ${fmtKzt(o.price + o.fee)}</p></a>`).join('')}</div>`
+        <div class="flex items-center justify-between"><h4 class="font-bold text-ink">${esc(o.placeName)}</h4>${orderEnd(o) && orderEnd(o) < Date.now() ? `<span class="text-xs font-bold text-sub">${t('t.expired')}</span>` : `<span class="text-xs font-bold text-brand dark:text-emerald-300">${t('t.paid')}</span>`}</div>
+        <p class="text-sm text-ink">${esc(tr(o.title))}</p>
+        <p class="text-xs text-sub numeric">${esc(tr(o.window))} · ${fmtKzt(o.price + o.fee)}</p></a>`).join('')}</div>`
       : `<div class="px-6 pt-16 md:pt-4 space-y-4"><p class="text-sm text-sub">${t('o.empty')}</p><a class="${LOGIN_BTN}" href="#/feed">${t('nav.feed')}</a></div>`;
   }
   shell(`<h2 class="px-4 pt-6 pb-3 md:pt-10 md:pb-6 text-2xl md:text-3xl font-extrabold text-ink">${t('o.title')}</h2>${inner}`, 'orders', { maxw: 'md:max-w-4xl' });
@@ -680,7 +715,7 @@ const kaspiLogo = (cls = 'w-5 h-5') => `<img alt="" class="${cls}" src="vendor/k
 
 async function renderCheckout(id) {
   const p = findPlace(id);
-  if (!p) { location.hash = '#/feed'; return; }
+  if (!p) { placeMissing(id); return; }
   if (!requireLogin(`#/checkout/${id}`)) return;
   const o = offerFor(p);
   let order = getDraft(id);
@@ -703,7 +738,7 @@ async function renderCheckout(id) {
       <div class="flex-1 p-4 space-y-4 pb-40 md:pb-4">
         <div class="flex gap-3 items-center">
           <img alt="" class="w-16 h-16 rounded-xl object-cover bg-muted" src="${esc(photoFor({ id: order.placeId, cat: order.cat }, 200))}">
-          <div class="min-w-0"><h5 class="font-bold text-ink">${esc(order.title)}</h5><p class="text-xs text-sub truncate">1 шт. · ${esc(order.placeName)}</p><p class="text-xs text-sub">${esc(t('c.pickupAt', { window: order.window }))}</p></div>
+          <div class="min-w-0"><h5 class="font-bold text-ink">${esc(tr(order.title))}</h5><p class="text-xs text-sub truncate">${t('qty1')} · ${esc(order.placeName)}</p><p class="text-xs text-sub">${esc(t('c.pickupAt', { window: tr(order.window) }))}</p></div>
         </div>
         <div class="bg-surface border border-line rounded-[18px] overflow-hidden">
           <div class="flex justify-between items-center px-4 py-3 border-b border-line"><span class="text-sm font-bold text-ink">${t('c.method')}</span>
@@ -849,6 +884,7 @@ async function renderTicket(id) {
       }).catch(() => {});
     }
   }
+  const expired = orderEnd(o) && orderEnd(o) < Date.now();
   const steps = [t('t.paid'), t('t.ready'), t('t.done')];
   const step = (i) => {
     const circle = i === 0 ? `<div class="w-8 h-8 rounded-full flex items-center justify-center bg-brand text-white">${icon('check', 'w-4 h-4')}</div>`
@@ -867,11 +903,11 @@ async function renderTicket(id) {
         <div class="flex items-center px-2">${step(0)}<div class="flex-1 h-0.5 mx-1 mb-5 bg-brand"></div>${step(1)}<div class="flex-1 h-0.5 mx-1 mb-5 bg-line"></div>${step(2)}</div>
         <div class="relative bg-surface border border-line rounded-[24px] p-5 space-y-4 card-shadow ticket">
           <div class="flex items-center justify-between gap-2">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand dark:text-emerald-300"><span class="w-1.5 h-1.5 rounded-full bg-current pulse-dot"></span> ${t('t.canPick')}</span>
+            ${expired ? `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-muted text-sub">${t('t.expired')}</span>` : `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand dark:text-emerald-300"><span class="w-1.5 h-1.5 rounded-full bg-current pulse-dot"></span> ${t('t.canPick')}</span>`}
             <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-sub">${kaspiLogo('w-3.5 h-3.5')} Kaspi · <span class="numeric">${fmtKzt(o.price + o.fee)}</span></span>
           </div>
           <div><h3 class="text-xl font-extrabold text-ink">${esc(o.placeName)}</h3><p class="text-sm text-sub">${o.address ? `${esc(o.address)} · ` : ''}${esc(t('city'))}</p></div>
-          <div class="flex justify-between items-center gap-3 p-3 rounded-xl bg-muted text-sm"><span class="font-semibold text-ink numeric">${esc(t('t.window', { w: o.window }))}</span><span class="text-sub text-right">${esc(o.title)}</span></div>
+          <div class="flex justify-between items-center gap-3 p-3 rounded-xl bg-muted text-sm"><span class="font-semibold text-ink numeric">${esc(t('t.window', { w: tr(o.window) }))}</span><span class="text-sub text-right">${esc(tr(o.title))}</span></div>
           <div class="ticket-cut"></div>
           <div class="flex justify-center"><div class="p-3 bg-white rounded-2xl qr" style="width:224px" id="tqr" aria-label="QR">…</div></div>
           <div class="flex justify-center items-baseline gap-2"><span class="text-sm text-sub">${t('t.staff')}</span><span class="text-2xl font-extrabold text-ink numeric" style="letter-spacing:.3em">${esc(o.pin)}</span></div>
@@ -893,7 +929,7 @@ function renderPay(payload) {
     if (!getOrders().some((x) => x.id === o.id)) store.set('cs_orders', [o, ...getOrders()].slice(0, 50));
     location.replace(`#/ticket/${o.id}`);
   } catch {
-    shell(`<div class="px-6 pt-16 space-y-4"><p class="text-sm text-error">Ссылка на оплату повреждена или устарела.</p><a class="${LOGIN_BTN}" href="#/feed">${t('nav.feed')}</a></div>`, 'feed');
+    shell(`<div class="px-6 pt-16 space-y-4"><p class="text-sm text-error">${t('pay.bad')}</p><a class="${LOGIN_BTN}" href="#/feed">${t('nav.feed')}</a></div>`, 'feed');
   }
 }
 
@@ -920,6 +956,7 @@ function toast(msg) {
 
 // ---------- роутер ----------
 let lastHash = null;
+let navDepth = 0; // сколько переходов сделано внутри сайта (для кнопки «Назад»)
 function route() {
   renderGen += 1;
   const hash = location.hash || '#/feed';
@@ -981,13 +1018,25 @@ root.addEventListener('click', async (e) => {
     case 'pop': state.popOpen = !state.popOpen; refresh(); break;
     case 'locate': state.popOpen = false; if (await locate()) loadPlaces(); else refresh(); break;
     case 'retry': loadPlaces(); break;
+    case 'reload': route(); break;
     case 'hide-geo': state.geoMsg = ''; refresh(); break;
     case 'more': state.shown += 24; renderFeed(); enrichFeedAddresses(); break;
     case 'search': state.searchOpen = !state.searchOpen; if (!state.searchOpen) state.q = ''; renderFeed(); break;
-    case 'back': if (history.length > 1) history.back(); else location.hash = '#/feed'; break;
+    case 'back': if (navDepth > 0) history.back(); else location.hash = '#/feed'; break;
     case 'share': {
       const url = location.href;
-      try { if (navigator.share) await navigator.share({ url, title: 'CrumbSave' }); else { await navigator.clipboard.writeText(url); toast(t('copied')); } } catch { /* отмена */ }
+      const copy = async () => {
+        try { await navigator.clipboard.writeText(url); }
+        catch {
+          const ta = document.createElement('textarea'); ta.value = url; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch { /* ignore */ } ta.remove();
+        }
+        toast(t('copied'));
+      };
+      const touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (touch && navigator.share) {
+        try { await navigator.share({ url, title: 'CrumbSave' }); } catch (err) { if (err && err.name !== 'AbortError') await copy(); }
+      } else await copy();
       break;
     }
     case 'book': if (requireLogin(`#/checkout/${d.id}`)) location.hash = `#/checkout/${d.id}`; break;
@@ -1003,6 +1052,6 @@ root.addEventListener('input', (e) => {
   if (e.target.id === 'q') { state.q = e.target.value; renderFeed(); }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.popOpen) { state.popOpen = false; refresh(); } });
-window.addEventListener('hashchange', route);
+window.addEventListener('hashchange', () => { navDepth += 1; route(); });
 
 route();
