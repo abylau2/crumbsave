@@ -200,3 +200,4 @@ html.dark .cs-nav a[aria-current=page]{color:#9fe3d3}
 .cs-auth-note{font-size:12px;color:var(--text-secondary);text-align:center}
 @media (max-width:767px){.cs-auth-side{padding:28px;gap:20px}.cs-auth-side h1{font-size:30px}.cs-auth-side ul{display:none}}
 html.dark .cs-auth-switch a{color:#7fd6c4}
+.cs-venue-ic{width:40px;height:40px;flex:none;border-radius:12px;display:flex;align-items:center;justify-content:center}.cs-venue-ic svg{width:20px;height:20px}html.dark .cs-venue-ic{filter:brightness(.85) saturate(.9)}

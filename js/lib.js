@@ -7,6 +7,16 @@ export const CATS = {
   groceries: 'Продукты',
 };
 
+// Города, где работает сервис (центр и радиус).
+export const CITIES = [
+  { id: 'almaty', lat: 43.2389, lng: 76.8897, r: 40000 },
+  { id: 'astana', lat: 51.1282, lng: 71.4304, r: 35000 },
+];
+export function cityAt(loc) {
+  if (!loc || loc.lat == null) return null;
+  for (const c of CITIES) if (haversine(loc, c) <= c.r) return c.id;
+  return null;
+}
 export const ALMATY = { lat: 43.238949, lng: 76.889709 };
 
 export function esc(s) {
@@ -162,7 +172,7 @@ export function streetCore(address) {
 // показывает ровно этот филиал; без адреса — карту с центром на нужной точке.
 export function twoGisUrl(name, lat, lng, address = '') {
   const q = /\d/.test(address) ? `${name}, ${streetCore(address)}` : name;
-  return `https://2gis.kz/almaty/search/${encodeURIComponent(q)}?m=${lng.toFixed(6)},${lat.toFixed(6)}/18`;
+  return `https://2gis.kz/search/${encodeURIComponent(q)}?m=${lng.toFixed(6)},${lat.toFixed(6)}/18`;
 }
 
 // Адреса из соседних зданий OSM (у заведений адрес часто не заполнен).

@@ -342,22 +342,20 @@ def scenarios(b):
     page.wait_for_timeout(1500)
     lbl = page.inner_text("[data-action=pop]")
     rec(G, "при разрешённой геолокации — «Рядом с вами» и места вокруг", "Рядом" in lbl, lbl); ctx.close()
-    # 11б. Преподаватель в Астане: GPS разрешён
-    ctx, page, _ = new_ctx(b, geo={"latitude": 51.1282, "longitude": 71.4304}); goto(page, "#/feed"); wait_feed(page)
+    # 11б. Преподаватель в Астане: GPS → заведения Астаны
+    ctx, page, m = new_ctx(b, geo={"latitude": 51.1282, "longitude": 71.4304}); goto(page, "#/feed"); wait_feed(page)
+    page.click("[data-action=pop]"); page.click(".geo-pop [data-action=locate]"); page.wait_for_timeout(2500)
+    lbl = page.inner_text("[data-action=pop]"); msgs = " ".join(page.locator("[role=status],[role=alert]").all_inner_texts())
+    page.locator("h4").first.click(); page.wait_for_selector("[data-action=book]"); page.wait_for_timeout(1500)
+    body = page.inner_text("#root"); href = page.get_attribute("a[data-route-id]", "href") or ""
+    rec(G, "Астана (GPS): заведения Астаны, город «Астана», 2GIS по координатам Астаны", "Рядом" in lbl and not msgs and "Астана" in body and "71.4" in href and "/almaty/" not in href, f"{lbl} | {msgs} | {href}")
+    ctx.close()
+    # 11в. Другой город (Шымкент) → нейтральная плашка, лента Алматы
+    ctx, page, _ = new_ctx(b, geo={"latitude": 42.3155, "longitude": 69.5869}); goto(page, "#/feed"); wait_feed(page)
     page.click("[data-action=pop]"); page.click(".geo-pop [data-action=locate]"); page.wait_for_timeout(2000)
     msg = " ".join(page.locator("[role=status]").all_inner_texts()); lbl = page.inner_text("[data-action=pop]")
-    rec(G, "Астана (GPS): плашка «только в Алматы», лента Алматы работает", "только в Алматы" in msg and "Алматы" in lbl and page.locator("h4").count() > 0 and "км" in msg, f"{lbl} | {msg}")
-    goto(page, "#/map"); page.wait_for_selector(".leaflet-container"); page.wait_for_timeout(800)
-    rec(G, "Астана: карта показывает Алматы", page.locator(".leaflet-marker-icon").count() > 0); ctx.close()
-    # 11в. Астана без GPS (по сети)
-    class AstanaIP(Mock):
-        def install(self, ctx):
-            super().install(ctx)
-            ctx.route("**/ipwho.is/**", lambda r: r.fulfill(status=200, content_type="application/json", headers={"access-control-allow-origin": "*"}, body=json.dumps({"success": True, "city": "Astana", "latitude": 51.1694, "longitude": 71.4491})))
-    ctx, page, _ = new_ctx(b, mock=AstanaIP()); goto(page, "#/feed"); wait_feed(page)
-    page.click("[data-action=pop]"); page.click(".geo-pop [data-action=locate]"); page.wait_for_timeout(2000)
-    msg = " ".join(page.locator("[role=status]").all_inner_texts())
-    rec(G, "Астана (по сети): та же плашка, без «(примерно)»", "только в Алматы" in msg and "примерно)" not in page.inner_text("[data-action=pop]"), msg); ctx.close()
+    rec(G, "Другой город: «В вашем городе пока не работает», лента Алматы", "не работает" in msg and "Алматы" in lbl and page.locator("h4").count() > 0, f"{lbl} | {msg}")
+    ctx.close()
     # 11г. Карта: подписи меток не перекрываются
     ctx, page, _ = new_ctx(b); goto(page, "#/map"); page.wait_for_selector(".leaflet-marker-icon"); page.wait_for_timeout(1000)
     ov = page.evaluate('''() => { const r = [...document.querySelectorAll('.leaflet-marker-icon')].map(e => e.firstElementChild ? e.firstElementChild.getBoundingClientRect() : e.getBoundingClientRect()); let n = 0; for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) { const a = r[i], c = r[j]; if (a.left < c.right - 2 && c.left < a.right - 2 && a.top < c.bottom - 2 && c.top < a.bottom - 2) n++; } return [r.length, n]; }''')

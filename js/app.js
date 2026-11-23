@@ -1,9 +1,9 @@
 import {
   ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
-  packOrder, unpackOrder, photoFor, logoText, addressQuery, nearestAddress,
-} from './lib.js?v=20261123c';
-import { DICT, LIB } from './i18n.js?v=20261123c';
+  packOrder, unpackOrder, photoFor, cityAt, addressQuery, nearestAddress,
+} from './lib.js?v=20261123d';
+import { DICT, LIB } from './i18n.js?v=20261123d';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -161,17 +161,15 @@ async function locate() {
   state.geoMsg = err ? geoErrorText(err) : t('geo.unsupported');
   return false;
 }
-// Сервис пока работает только в Алматы: если человек дальше 40 км — показываем центр Алматы и объясняем почему.
-const SERVICE_RADIUS = 40000;
+// Сервис работает в городах из CITIES (Алматы, Астана). В другом месте — показываем центр Алматы и объясняем почему.
 function outsideService(loc) {
-  const d = haversine(loc, ALMATY);
-  if (d <= SERVICE_RADIUS) return false;
+  if (cityAt(loc)) return false;
   setDistrict('center');
   state.geoInfo = true;
-  const km = Math.round(d / 1000);
-  state.geoMsg = t('geo.onlyAlmaty', { km: km >= 1000 ? km.toLocaleString('ru-RU') : km });
+  state.geoMsg = t('geo.otherCity');
   return true;
 }
+const cityName = (loc) => t(`city.${cityAt(loc) || 'almaty'}`);
 function setDistrict(id) {
   const d = DISTRICTS.find((x) => x.id === id) || DISTRICTS[0];
   state.loc = { lat: d.lat, lng: d.lng };
@@ -378,6 +376,18 @@ function timeText(o) {
 }
 function soonCls(o) { return o.minsLeft != null && o.open && o.minsLeft <= 60 ? 'text-urgent font-semibold' : 'text-sub'; }
 
+const VENUE_ICONS = {
+  coffee: ['#efe4d6', '#6b4a2f', '<path d="M10 2v2"/><path d="M14 2v2"/><path d="M6 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/>'],
+  bakery: ['#f6ecd8', '#8a5a00', '<path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3"/><path d="M12 8v3"/><path d="M17 8v3"/>'],
+  ready: ['#fde5d9', '#9a3412', '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>'],
+  groceries: ['#e3ecdc', '#2f5d3a', '<path d="m15 11-1 9"/><path d="m19 11-4-7"/><path d="M2 11h20"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/><path d="M4.5 15.5h15"/><path d="m5 11 4-7"/><path d="m9 11 1 9"/>'],
+};
+function venueIcon(p) {
+  const key = /кофе/i.test(p.kind || '') ? 'coffee' : (VENUE_ICONS[p.cat] ? p.cat : 'ready');
+  const [bg, fg, paths] = VENUE_ICONS[key];
+  return `<div class="cs-venue-ic" style="background:${bg};color:${fg}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg></div>`;
+}
+
 function placeCard(p, eager) {
   const o = offerFor(p);
   const lowCls = o.left <= 1 ? 'bg-urgent-soft text-urgent' : 'bg-surface/95 text-ink';
@@ -391,7 +401,7 @@ function placeCard(p, eager) {
       </div>
       <div class="p-4 space-y-3">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 shrink-0 rounded-full bg-brand-soft text-brand dark:text-emerald-300 text-[10px] font-extrabold flex items-center justify-center">${esc(logoText(p.name))}</div>
+          ${venueIcon(p)}
           <div class="min-w-0">
             <div class="flex items-center gap-2"><h4 class="font-bold text-[15px] text-ink truncate">${esc(p.name)}</h4>
               ${p.distance != null ? `<span class="flex items-center gap-0.5 text-xs font-semibold text-ink shrink-0">${icon('pin', 'w-3 h-3')} ${esc(fmtDist(p.distance))}</span>` : ''}</div>
@@ -421,7 +431,7 @@ function locLabel() {
   if (state.source === 'gps') return t('near');
   if (state.source === 'ip') return t('near.approx');
   if (state.source === 'district') return tr(state.district);
-  return t('city');
+  return cityName(state.loc);
 }
 function geoMsgHtml() {
   if (!state.geoMsg) return '';
@@ -536,7 +546,7 @@ function renderPlace(id) {
           <div class="space-y-1.5">
             <div class="flex items-center gap-1.5 text-sm text-sub"><span class="font-semibold text-ink">${esc(p.name)}</span>·<span>${esc(tr(p.kind))}</span>${p.distance != null ? `·<span class="flex items-center gap-0.5">${icon('pin', 'w-3 h-3')} ${esc(fmtDist(p.distance))}</span>` : ''}</div>
             <h2 class="text-2xl md:text-4xl font-extrabold text-ink">${esc(tr(o.title))}</h2>
-            <p class="flex items-center gap-1 text-sm text-sub">${icon('pin', 'w-4 h-4 shrink-0')} ${p.address ? esc(p.address) : esc(addrCache[p.id] ? t('city') : t('l.addrLoading'))}</p>
+            <p class="flex items-center gap-1 text-sm text-sub">${icon('pin', 'w-4 h-4 shrink-0')} ${p.address ? esc(p.address) : esc(addrCache[p.id] ? cityName(p) : t('l.addrLoading'))}</p>
             <p class="text-sm font-semibold text-sub">${esc(leftText(o.left))} · <span class="text-urgent">${t('demo')}</span></p>
           </div>
           <div class="flex items-center justify-between p-4 rounded-[18px] bg-brand-soft">
@@ -550,7 +560,7 @@ function renderPlace(id) {
           <p class="text-sm"><span class="font-semibold text-ink">${t('l.cancel')}</span><span class="text-sub">${t('l.cancelVal')}</span></p>
           <p class="text-xs text-sub">${t('l.demoNote')}</p>
           <div class="flex items-center justify-between pt-4 border-t border-line gap-3">
-            <div class="min-w-0"><p class="text-sm font-semibold text-ink">${esc(p.name)}</p><p class="text-xs text-sub">${p.address ? `${esc(p.address)} · ${esc(t('city'))}` : esc(t('city'))}</p></div>
+            <div class="min-w-0"><p class="text-sm font-semibold text-ink">${esc(p.name)}</p><p class="text-xs text-sub">${p.address ? `${esc(p.address)} · ${esc(cityName(p))}` : esc(cityName(p))}</p></div>
             <a href="${esc(twoGisUrl(p.name, p.lat, p.lng, p.address))}" data-route-id="${esc(p.id)}" data-route-name="${esc(p.name)}" data-route-lat="${p.lat}" data-route-lng="${p.lng}" data-route-addr="${esc(p.address || '')}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1.5 text-sm font-bold text-brand dark:text-emerald-300 min-h-[44px] shrink-0">${icon('nav', 'w-4 h-4')} ${t('l.route')}</a>
           </div>
           <div class="flex items-center gap-4 text-sm font-semibold text-brand dark:text-emerald-300 flex-wrap">
@@ -728,7 +738,7 @@ function renderProfile() {
           <div><span class="block text-sm font-semibold text-ink">${t('p.dark')}</span><span class="block text-xs text-sub">${t('p.darkSub')}</span></div></div>
           <button class="px-3 h-9 rounded-full bg-muted text-xs font-bold text-ink" data-action="theme">${dark ? t('p.toLight') : t('p.toDark')}</button></div></div>
       <div class="bg-surface border border-line rounded-[18px] p-4 space-y-2 text-sm">
-        <div class="flex justify-between"><span class="text-sub">${t('p.city')}</span><span class="font-semibold text-ink">${t('city')}</span></div>
+        <div class="flex justify-between"><span class="text-sub">${t('p.city')}</span><span class="font-semibold text-ink">${cityName(state.loc)}</span></div>
         <div class="flex justify-between items-center"><span class="text-sub">${t('lang')}</span>${langSwitch()}</div>
         <p class="text-xs text-sub pt-2 border-t border-line">${t('p.about')}</p></div>
     </div>`, 'profile', { maxw: 'md:max-w-2xl' });
@@ -939,7 +949,7 @@ async function renderTicket(id) {
             ${expired ? `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-muted text-sub">${t('t.expired')}</span>` : `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand dark:text-emerald-300"><span class="w-1.5 h-1.5 rounded-full bg-current pulse-dot"></span> ${t('t.canPick')}</span>`}
             <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-sub">${kaspiLogo('w-3.5 h-3.5')} Kaspi · <span class="numeric">${fmtKzt(o.price + o.fee)}</span></span>
           </div>
-          <div><h3 class="text-xl font-extrabold text-ink">${esc(o.placeName)}</h3><p class="text-sm text-sub">${o.address ? `${esc(o.address)} · ` : ''}${esc(t('city'))}</p></div>
+          <div><h3 class="text-xl font-extrabold text-ink">${esc(o.placeName)}</h3><p class="text-sm text-sub">${o.address ? `${esc(o.address)} · ` : ''}${esc(cityName(o))}</p></div>
           <div class="flex justify-between items-center gap-3 p-3 rounded-xl bg-muted text-sm"><span class="font-semibold text-ink numeric">${esc(t('t.window', { w: tr(o.window) }))}</span><span class="text-sub text-right">${esc(tr(o.title))}</span></div>
           <div class="ticket-cut"></div>
           <div class="flex justify-center"><div class="p-3 bg-white rounded-2xl qr" style="width:224px" id="tqr" aria-label="QR">…</div></div>

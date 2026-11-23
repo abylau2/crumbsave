@@ -78,7 +78,7 @@ test('demoOffer детерминирован и окно в будущем', () 
 
 test('2ГИС: ссылка ведёт на поиск заведения рядом с точкой', () => {
   const u = twoGisUrl('Paul Bakery', 43.2445, 76.9575);
-  assert.equal(u, 'https://2gis.kz/almaty/search/Paul%20Bakery?m=76.957500,43.244500/18');
+  assert.equal(u, 'https://2gis.kz/search/Paul%20Bakery?m=76.957500,43.244500/18');
 });
 
 test('overpassQuery содержит радиус и координаты', () => {
@@ -102,7 +102,7 @@ test('2GIS link targets a specific branch by address', () => {
   assert.equal(streetCore('Абай даңғылы, 159Б'), 'Абай 159Б');
   assert.equal(streetCore('улица Брусиловского, 199'), 'Брусиловского 199');
   const u = twoGisUrl('Degirmen', 43.2388, 76.889, 'Абай даңғылы, 159Б');
-  assert.ok(u.startsWith('https://2gis.kz/almaty/search/Degirmen%2C%20%D0%90%D0%B1%D0%B0%D0%B9%20159%D0%91?m=76.889000,43.238800/18'), u);
+  assert.ok(u.startsWith('https://2gis.kz/search/Degirmen%2C%20%D0%90%D0%B1%D0%B0%D0%B9%20159%D0%91?m=76.889000,43.238800/18'), u);
   assert.ok(twoGisUrl('X', 1, 2, 'проспект Абая').includes('/search/X?'));
 });
 test('nearestAddress picks closest building within limit', () => {
@@ -128,4 +128,11 @@ test('окно выдачи — перед закрытием в 22:00 или 23
     assert.ok(o.minsLeft > 0 && o.minsLeft <= 180);
   }
   assert.deepEqual([...closes].sort(), ['22:00', '23:00']);
+});
+
+import { cityAt } from '../js/lib.js';
+test('cityAt: Алматы, Астана, другой город', () => {
+  assert.equal(cityAt({ lat: 43.25, lng: 76.92 }), 'almaty');
+  assert.equal(cityAt({ lat: 51.17, lng: 71.45 }), 'astana');
+  assert.equal(cityAt({ lat: 42.32, lng: 69.59 }), null); // Шымкент
 });
