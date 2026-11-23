@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, cityAt, addressQuery, nearestAddress,
-} from './lib.js?v=20261123h';
-import { DICT, LIB } from './i18n.js?v=20261123h';
+} from './lib.js?v=20261123i';
+import { DICT, LIB } from './i18n.js?v=20261123i';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -1152,3 +1152,6 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.po
 window.addEventListener('hashchange', () => { navDepth += 1; route(); });
 
 route();
+
+// Фото не загрузилось (сеть, блокировщик) — прячем «битую» картинку, остаётся аккуратный фон карточки.
+document.addEventListener('error', (e) => { const el = e.target; if (el && el.tagName === 'IMG') el.style.visibility = 'hidden'; }, true);
