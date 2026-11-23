@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, cityAt, addressQuery, nearestAddress,
-} from './lib.js?v=20261123d';
-import { DICT, LIB } from './i18n.js?v=20261123d';
+} from './lib.js?v=20261123e';
+import { DICT, LIB } from './i18n.js?v=20261123e';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -582,7 +582,7 @@ async function renderMap() {
   if (state.status === 'idle') init();
   shell(`${cityRow(false)}
     ${geoMsgHtml()}
-    <div class="relative h-[calc(100dvh-140px)] md:h-[calc(100dvh-4rem-76px)] md:px-4 md:pb-4"><div id="map" class="w-full h-full z-0 md:rounded-[18px]" role="region" aria-label="${t('nav.map')}"></div></div>`, 'map', { maxw: 'md:max-w-none' });
+    <div class="relative h-[calc(100dvh-140px)] md:h-[calc(100dvh-4rem-76px)] md:px-4 md:pb-4"><div id="map" class="w-full h-full z-0 md:rounded-[18px]" role="region" aria-label="${t('nav.map')}"></div></div>`, 'map', { maxw: 'md:max-w-6xl' });
   try {
     if (!document.querySelector('link[href="vendor/leaflet.css"]')) {
       const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'vendor/leaflet.css'; document.head.appendChild(l);
@@ -701,9 +701,9 @@ function renderFavorites() {
     const list = getFavs().map(findPlace).filter(Boolean);
     inner = list.length
       ? `<div class="px-4 pb-6"><div class="grid gap-4 md:grid-cols-2 md:gap-5">${list.map((p) => placeCard(p)).join('')}</div></div>`
-      : `<div class="px-6 pt-16 md:pt-4"><p class="text-sm text-sub">${t('f.empty')}</p></div>`;
+      : `<div class="px-4 pt-6 md:pt-0 space-y-4"><p class="text-sm text-sub">${t('f.empty')}</p><a class="${LOGIN_BTN}" href="#/feed">${t('f.toFeed')}</a></div>`;
   }
-  shell(`<h2 class="px-4 pt-6 pb-3 md:pt-10 md:pb-6 text-2xl md:text-3xl font-extrabold text-ink">${t('f.title')}</h2>${inner}`, 'favorites', { maxw: user ? 'md:max-w-6xl' : 'md:max-w-4xl' });
+  shell(`<h2 class="px-4 pt-6 pb-3 md:pt-10 md:pb-6 text-2xl md:text-3xl font-extrabold text-ink">${t('f.title')}</h2>${inner}`, 'favorites', { maxw: user ? 'md:max-w-6xl' : 'md:max-w-6xl cs-page-narrow' });
 }
 
 function renderOrders() {
@@ -718,9 +718,9 @@ function renderOrders() {
         <div class="flex items-center justify-between"><h4 class="font-bold text-ink">${esc(o.placeName)}</h4>${orderEnd(o) && orderEnd(o) < Date.now() ? `<span class="text-xs font-bold text-sub">${t('t.expired')}</span>` : `<span class="text-xs font-bold text-brand dark:text-emerald-300">${t('t.paid')}</span>`}</div>
         <p class="text-sm text-ink">${esc(tr(o.title))}</p>
         <p class="text-xs text-sub numeric">${esc(tr(o.window))} · ${fmtKzt(o.price + o.fee)}</p></a>`).join('')}</div>`
-      : `<div class="px-6 pt-16 md:pt-4 space-y-4"><p class="text-sm text-sub">${t('o.empty')}</p><a class="${LOGIN_BTN}" href="#/feed">${t('nav.feed')}</a></div>`;
+      : `<div class="px-4 pt-6 md:pt-0 space-y-4"><p class="text-sm text-sub">${t('o.empty')}</p><a class="${LOGIN_BTN}" href="#/feed">${t('f.toFeed')}</a></div>`;
   }
-  shell(`<h2 class="px-4 pt-6 pb-3 md:pt-10 md:pb-6 text-2xl md:text-3xl font-extrabold text-ink">${t('o.title')}</h2>${inner}`, 'orders', { maxw: 'md:max-w-4xl' });
+  shell(`<h2 class="px-4 pt-6 pb-3 md:pt-10 md:pb-6 text-2xl md:text-3xl font-extrabold text-ink">${t('o.title')}</h2>${inner}`, 'orders', { maxw: 'md:max-w-6xl cs-page-narrow' });
 }
 
 function renderProfile() {
@@ -741,7 +741,7 @@ function renderProfile() {
         <div class="flex justify-between"><span class="text-sub">${t('p.city')}</span><span class="font-semibold text-ink">${cityName(state.loc)}</span></div>
         <div class="flex justify-between items-center"><span class="text-sub">${t('lang')}</span>${langSwitch()}</div>
         <p class="text-xs text-sub pt-2 border-t border-line">${t('p.about')}</p></div>
-    </div>`, 'profile', { maxw: 'md:max-w-2xl' });
+    </div>`, 'profile', { maxw: 'md:max-w-6xl cs-page-narrow' });
 }
 
 // --- заказ и оплата ---
@@ -774,11 +774,11 @@ async function renderCheckout(id) {
         <button aria-label="${t('back')}" data-action="back" class="w-11 h-11 rounded-full bg-surface border border-line flex items-center justify-center text-ink">${icon('back', 'w-5 h-5')}</button>
         <div class="min-w-0"><h2 class="font-bold text-ink">${t('c.title')}</h2><p class="text-xs text-sub truncate">${esc(order.placeName)}${order.address ? ` • ${esc(order.address)}` : ''}</p></div>
       </div>
-      <div class="bg-brand-soft px-4 py-2 md:rounded-xl flex items-center justify-between text-xs">
+      <div class="cs-hold-strip bg-brand-soft px-4 py-2 flex items-center justify-between text-xs">
         <span class="flex items-center gap-2 font-semibold text-ink"><span class="w-2 h-2 rounded-full bg-brand pulse-dot"></span> ${t('c.held')}</span>
         <span class="flex items-center gap-1 font-bold text-brand dark:text-emerald-300 numeric">${icon('clock', 'w-3.5 h-3.5')} <span id="hold">10:00</span></span>
       </div>
-      <div class="flex-1 p-4 space-y-4 pb-40 md:pb-4">
+      <div class="cs-co-main p-4 space-y-4">
         <div class="flex gap-3 items-center">
           <img alt="" class="w-16 h-16 rounded-xl object-cover bg-muted" src="${esc(photoFor({ id: order.placeId, cat: order.cat }, 200))}">
           <div class="min-w-0"><h5 class="font-bold text-ink">${esc(tr(order.title))}</h5><p class="text-xs text-sub truncate">${t('qty1')} · ${esc(order.placeName)}</p><p class="text-xs text-sub">${esc(t('c.pickupAt', { window: tr(order.window) }))}</p></div>
@@ -788,7 +788,7 @@ async function renderCheckout(id) {
             <span class="flex items-center gap-1 text-[11px] font-semibold text-brand dark:text-emerald-300">${icon('shield', 'w-3.5 h-3.5')} ${t('c.zeroFee')}</span></div>
           <div class="flex items-center gap-3 px-4 py-3.5">
             <span class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:#fdeceb">${kaspiLogo('w-6 h-6')}</span>
-            <span class="flex-1 min-w-0"><span class="block text-sm font-semibold text-ink">Kaspi Pay</span><span class="block text-[11px] text-sub">${t('c.kaspiSub')}</span></span>
+            <span class="flex-1 min-w-0"><span class="block text-sm font-semibold text-ink">Kaspi QR</span><span class="block text-[11px] text-sub">${t('c.kaspiSub')}</span></span>
             <span class="w-6 h-6 rounded-full bg-brand text-white flex items-center justify-center">${icon('check', 'w-3.5 h-3.5')}</span>
           </div>
           <div class="px-4 pb-3.5"><div class="flex items-start gap-2 rounded-xl bg-muted px-3 py-2.5 text-[11px] text-sub">${icon('qr', 'w-4 h-4 shrink-0 text-ink')}<span>${t('c.kaspiHow')}</span></div></div>
@@ -801,7 +801,7 @@ async function renderCheckout(id) {
           <p class="text-xs text-sub">${t('l.cancelVal')}</p>
         </div>
       </div>
-      <div class="fixed md:static bottom-0 inset-x-0 mx-auto max-w-[430px] md:max-w-none bg-surface md:bg-transparent border-t md:border-0 border-line p-4 pb-6 space-y-2 z-20" id="pay-body">
+      <div class="cs-paybar space-y-2" id="pay-body">
         <button class="w-full min-h-[52px] rounded-[14px] px-4 font-bold text-sm text-white flex items-center justify-between kaspi-btn" style="background:${KASPI_RED}" data-action="kaspi">
           <span class="flex items-center gap-2"><span class="w-6 h-6 rounded-md bg-white flex items-center justify-center">${kaspiLogo('w-5 h-5')}</span>${t('c.kaspiOpen')} · <span class="numeric">${fmtKzt(total)}</span></span>${icon('arrowR', 'w-4 h-4')}</button>
         <p class="text-center text-[11px] text-sub">${t('c.offer')}</p>
@@ -898,6 +898,15 @@ function openHelp() {
   m.querySelector('.kaspi-x').focus();
 }
 
+function ticketLeft(o) {
+  const end = orderEnd(o); const left = Math.round((end - Date.now()) / 60000);
+  const m = String(o.window || '').match(/(\d{1,2}):(\d{2})–/);
+  if (!end || left <= 0 || !m) return '';
+  const start = new Date(end); start.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  if (Date.now() < start.getTime()) return '';
+  return ` · <span class="text-urgent">${esc(t('time.left', { t: fmtMins(left), c: String(o.window).slice(-5) }))}</span>`;
+}
+
 function saveOrder(o) {
   store.set('cs_orders', getOrders().map((x) => (x.id === o.id ? o : x)));
 }
@@ -950,7 +959,7 @@ async function renderTicket(id) {
             <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-sub">${kaspiLogo('w-3.5 h-3.5')} Kaspi · <span class="numeric">${fmtKzt(o.price + o.fee)}</span></span>
           </div>
           <div><h3 class="text-xl font-extrabold text-ink">${esc(o.placeName)}</h3><p class="text-sm text-sub">${o.address ? `${esc(o.address)} · ` : ''}${esc(cityName(o))}</p></div>
-          <div class="flex justify-between items-center gap-3 p-3 rounded-xl bg-muted text-sm"><span class="font-semibold text-ink numeric">${esc(t('t.window', { w: tr(o.window) }))}</span><span class="text-sub text-right">${esc(tr(o.title))}</span></div>
+          <div class="flex justify-between items-center gap-3 p-3 rounded-xl bg-muted text-sm"><span class="font-semibold text-ink numeric">${esc(t('t.window', { w: tr(o.window) }))}${ticketLeft(o)}</span><span class="text-sub text-right">${esc(tr(o.title))}</span></div>
           <div class="ticket-cut"></div>
           <div class="flex justify-center"><div class="p-3 bg-white rounded-2xl qr" style="width:224px" id="tqr" aria-label="QR">…</div></div>
           <div class="flex justify-center items-baseline gap-2"><span class="text-sm text-sub">${t('t.staff')}</span><span class="text-2xl font-extrabold text-ink numeric" style="letter-spacing:.3em">${esc(o.pin)}</span></div>
