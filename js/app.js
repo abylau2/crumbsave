@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, cityAt, addressQuery, nearestAddress,
-} from './lib.js?v=20261123g';
-import { DICT, LIB } from './i18n.js?v=20261123g';
+} from './lib.js?v=20261123h';
+import { DICT, LIB } from './i18n.js?v=20261123h';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -84,6 +84,7 @@ function persistPlace(p) { const pc = store.get('cs_pc', {}); pc[p.id] = p; stor
 
 // ---------- иконки (lucide) ----------
 const ICONS = {
+  zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>',
   compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/>',
   map: '<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/>',
   heart: '<path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/>',
@@ -670,25 +671,49 @@ function requireLogin(next) {
   location.hash = '#/login';
   return false;
 }
+const AUTH_FALLBACK = [
+  { kind: 'Кондитерская', name: 'Kulikov', title: 'Сладкий набор', window: 'Сегодня 21:00–22:00', price: 1190, off: 67, tint: '#f4ead6' },
+  { kind: 'Кафе', name: 'Degirmen', title: 'Набор готовых блюд', window: 'Сегодня 22:00–23:00', price: 1390, off: 63, tint: '#f1dccb' },
+  { kind: 'Кофейня', name: 'Coffee Boom', title: 'Кофейный набор: десерты и сэндвичи', window: 'Сегодня 21:30–23:00', price: 1290, off: 66, tint: '#ebe2d8' },
+];
+function authBags() {
+  const picks = [];
+  const seen = new Set();
+  for (const p of state.places || []) {
+    const o = offerFor(p);
+    if (!o.left || seen.has(p.cat)) continue;
+    seen.add(p.cat); picks.push({ kind: p.kind, name: p.name, title: o.title, window: o.window, price: o.price, off: o.discount, img: photoFor(p) });
+    if (picks.length === 3) break;
+  }
+  const list = picks.length === 3 ? picks : AUTH_FALLBACK;
+  return list.map((b, i) => `<div class="cs-fan-card cs-fan-${i}" aria-hidden="true">
+      <div class="cs-fan-ph" style="background:${b.tint || 'var(--surface-muted)'}">${b.img ? `<img alt="" src="${esc(b.img)}" loading="lazy" decoding="async">` : ''}<span class="cs-off">−${b.off}%</span></div>
+      <div class="cs-fan-body"><span class="cs-eyebrow" style="font-size:10px">${esc(tr(b.kind))}</span><b>${esc(b.name)} · ${esc(tr(b.title))}</b>
+        <span class="cs-fan-row"><span>${esc(tr(b.window))}</span><b class="numeric">${fmtKzt(b.price)}</b></span></div></div>`).join('');
+}
 function renderAuth(mode) {
   const isLogin = mode === 'login';
   root.innerHTML = `<main class="cs-auth">
     <section class="cs-auth-side">
       <a class="cs-brand cs-brand-light" href="#/feed">${LOGO_SVG}CrumbSave</a>
-      <div class="cs-auth-copy"><h1>${t('a.heroTitle')}</h1><p>${t('a.heroSub')}</p></div>
-      <ul><li><b>1</b>${t('a.pt1')}</li><li><b>2</b>${t('a.pt2')}</li><li><b>3</b>${t('a.pt3')}</li></ul>
+      <div class="cs-auth-copy"><span class="cs-eyebrow cs-eyebrow-light">${t('a.eyebrow')}</span><h1>${t('a.h1a')}<br><em>${t('a.h1b')}</em></h1><p>${t('a.sub')}</p></div>
+      <div class="cs-fan">${authBags()}</div>
     </section>
     <section class="cs-auth-form">
       <form id="auth" novalidate>
         <a class="cs-auth-back" href="#/feed">${icon('back', 'w-4 h-4')}${t('a.backToFeed')}</a>
-        <h2>${t(isLogin ? 'a.login' : 'a.register')}</h2>
-        <p class="cs-auth-switch">${t(isLogin ? 'a.noAccount' : 'a.haveAccount')} <a href="#/${isLogin ? 'register' : 'login'}">${t(isLogin ? 'a.toRegister' : 'a.toLogin')}</a></p>
+        <nav class="cs-seg cs-auth-tabs" aria-label="${t('a.login')} / ${t('a.register')}">
+          <a href="#/login" ${isLogin ? 'aria-current="page"' : ''}>${t('a.login')}</a><a href="#/register" ${isLogin ? '' : 'aria-current="page"'}>${t('a.register')}</a>
+        </nav>
+        <div><h2>${t(isLogin ? 'a.tLogin1' : 'a.tReg1')} <em>${t(isLogin ? 'a.tLogin2' : 'a.tReg2')}</em></h2><p class="cs-auth-switch">${t(isLogin ? 'a.sLogin' : 'a.sReg')}</p></div>
         ${isLogin ? '' : `<label class="cs-field">${t('a.name')}<input name="name" autocomplete="name" placeholder="${t('a.namePh')}"></label>`}
         <label class="cs-field">${t('a.email')}<input name="email" type="email" autocomplete="email" placeholder="you@mail.kz"></label>
-        <label class="cs-field">${t('a.password')}<input name="pw" type="password" autocomplete="${isLogin ? 'current-password' : 'new-password'}" placeholder="••••••••"></label>
+        <label class="cs-field">${t('a.password')}<input name="pw" type="password" autocomplete="${isLogin ? 'current-password' : 'new-password'}" placeholder="${t('a.pwPh')}"></label>
         <p class="cs-auth-err" id="auth-err" role="alert"></p>
-        <button type="submit" class="cs-auth-btn">${t(isLogin ? 'a.submitLogin' : 'a.submitRegister')}</button>
-        <p class="cs-auth-note">${t('a.demoShort')}</p>
+        <button type="submit" class="cs-auth-btn">${t(isLogin ? 'a.submitLogin' : 'a.submitRegister')} <span aria-hidden="true">↗</span></button>
+        <div class="cs-or"><span></span>${t('a.or')}<span></span></div>
+        <button type="button" class="cs-demo-btn" data-action="demo-login">${icon('zap', 'w-[18px] h-[18px]')}${t('a.demoBtn')}</button>
+        <p class="cs-auth-note">${t('a.kaspi')}<br>${t('a.demoShort')}</p>
       </form>
     </section></main>`;
   const f = document.getElementById('auth');
@@ -1115,6 +1140,7 @@ root.addEventListener('click', async (e) => {
     case 'help': openHelp(); break;
     case 'confirm-qr': { const dr = sess.get('cs_draft', null); if (dr) markPaid(dr); break; }
     case 'logout': store.del('cs_user'); route(); break;
+    case 'demo-login': { store.set('cs_user', { email: 'demo@crumbsave.kz', name: t('a.demoName') }); const next = sess.get('cs_next', '#/feed'); sess.del('cs_next'); location.hash = next; break; }
     case 'theme': store.set('cs_dark', !store.get('cs_dark', false)); applyTheme(); route(); break;
     default: break;
   }
