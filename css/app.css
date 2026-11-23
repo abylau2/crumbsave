@@ -1,11 +1,11 @@
 /* CrumbSave — дизайн-токены и утилиты перенесены с оригинального сайта (Tailwind-совместимые имена классов). */
-:root{--bg:#faf9f6;--surface:#fff;--surface-muted:#f2f3ef;--text:#202522;--text-secondary:#626a65;--border:#dce2dc;--brand:#1f5750;--brand-hover:#184840;--brand-soft:#e8f2ee;--urgent:#a94831;--urgent-soft:#fbede7;--error:#b42318;--kaspi:#d92d20;--focus:#0b6d62;--shadow-card:0 2px 8px #1928200d;
+:root{--bg:#f7f6f1;--surface:#fff;--surface-muted:#eef1e8;--text:#202820;--text-secondary:#5b685e;--border:#dfe4d9;--brand:#183d32;--brand-hover:#0f2a22;--brand-soft:#e8eddf;--urgent:#a5533a;--urgent-soft:#f8eae3;--error:#b42318;--kaspi:#d92d20;--focus:#0b6d62;--shadow-card:0 2px 8px #1928200d;
 --spacing:.25rem;--container-md:28rem;--container-2xl:42rem;--container-4xl:56rem;--container-6xl:72rem;
 --color-canvas:var(--bg);--color-surface:var(--surface);--color-muted:var(--surface-muted);--color-ink:var(--text);--color-sub:var(--text-secondary);--color-line:var(--border);--color-brand:var(--brand);--color-brand-hover:var(--brand-hover);--color-brand-soft:var(--brand-soft);--color-urgent:var(--urgent);--color-urgent-soft:var(--urgent-soft);--color-error:var(--error);--color-kaspi:var(--kaspi);--color-amber-400:oklch(82.8% .189 84.429);--color-emerald-300:oklch(84.5% .143 164.978);--color-emerald-400:oklch(76.5% .177 163.223)}
 html.dark{--bg:#151816;--surface:#1e2320;--surface-muted:#272e2a;--text:#f2f4f2;--text-secondary:#9ba49e;--border:#2d3631;--brand:#2b7a70;--brand-hover:#338c81;--brand-soft:#1e332c;--urgent:#f0936f;--urgent-soft:#38241f;--error:#e5483d;--kaspi:#f14635;--focus:#3abbaa;--shadow-card:0 2px 8px #00000059}
 
 *,::after,::before{box-sizing:border-box;border:0 solid;margin:0;padding:0}
-html{-webkit-text-size-adjust:100%;line-height:1.5;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%;line-height:1.5;font-family:Onest,-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
 h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}
 a{color:inherit;text-decoration:inherit}
 img,svg{vertical-align:middle;display:block}img{max-width:100%;height:auto}
@@ -163,7 +163,7 @@ html.dark .dark\:text-emerald-300{color:var(--color-emerald-300)}html.dark .dark
 /* ---- шапка и вход (по макету) ---- */
 .cs-header{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .cs-hwrap{max-width:72rem;margin:0 auto;padding:0 24px;height:64px;display:flex;align-items:center;gap:28px}
-.cs-brand{display:flex;align-items:center;gap:10px;font-family:Manrope,-apple-system,"SF Pro Text",Inter,system-ui,sans-serif;font-weight:800;font-size:19px;color:var(--text)}
+.cs-brand{display:flex;align-items:center;gap:10px;font-family:Onest,-apple-system,system-ui,sans-serif;font-weight:700;font-size:20px;letter-spacing:-.02em;color:var(--text)}
 .cs-brand svg{width:36px;height:36px;flex:none}
 .cs-nav{display:flex;gap:4px;flex:1}
 .cs-nav a{height:40px;padding:0 16px;border-radius:999px;display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;color:var(--text-secondary);transition:background .15s,color .15s}
@@ -180,7 +180,7 @@ html.dark .cs-nav a[aria-current=page]{color:#9fe3d3}
 .cs-auth-side{flex:1 1 480px;min-width:0;background:#2f5a55;color:#fff;padding:56px;display:flex;flex-direction:column;justify-content:space-between;gap:40px}
 .cs-brand-light{color:#fff;font-size:22px}.cs-brand-light svg{width:44px;height:44px}
 .cs-auth-copy{display:flex;flex-direction:column;gap:18px;max-width:480px}
-.cs-auth-side h1{font-family:Manrope,-apple-system,Inter,system-ui,sans-serif;font-size:44px;line-height:1.08;font-weight:800}
+.cs-auth-side h1{font-family:Lora,Georgia,serif;font-size:48px;line-height:1.05;font-weight:600;letter-spacing:-.03em}
 .cs-auth-side p{font-size:17px;line-height:1.55;opacity:.92}
 .cs-auth-side ul{list-style:none;display:flex;flex-direction:column;gap:12px;font-size:15px}
 .cs-auth-side li{display:flex;gap:10px;align-items:center}
@@ -189,7 +189,7 @@ html.dark .cs-nav a[aria-current=page]{color:#9fe3d3}
 .cs-auth-form form{width:100%;max-width:440px;display:flex;flex-direction:column;gap:16px}
 .cs-auth-back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--text-secondary);align-self:flex-start}
 .cs-auth-back:hover{color:var(--text)}
-.cs-auth-form h2{font-family:Manrope,-apple-system,Inter,system-ui,sans-serif;font-size:30px;font-weight:800}
+.cs-auth-form h2{font-family:Lora,Georgia,serif;font-size:32px;font-weight:600;letter-spacing:-.02em}
 .cs-auth-switch{color:var(--text-secondary)}.cs-auth-switch a{color:var(--brand);font-weight:700;text-decoration:underline}
 .cs-field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
 .cs-field input{height:52px;padding:0 16px;border-radius:14px;border:1px solid var(--border);background:var(--surface);font-size:15px;font-weight:400;color:var(--text)}
@@ -208,3 +208,7 @@ html.dark .cs-auth-switch a{color:#7fd6c4}
 /* страницы-списки выровнены по шапке, содержимое не шире 48rem */
 @media (width>=48rem){.cs-page-narrow>*{max-width:48rem}}
 @media (width>=48rem){.md\:pt-0{padding-top:0}}
+
+/* editorial type */
+h1.font-extrabold,h2.font-extrabold,.cs-serif{font-family:Lora,Georgia,serif!important;font-weight:600!important;letter-spacing:-.025em}
+.cs-price{color:var(--urgent)}

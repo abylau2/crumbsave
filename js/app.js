@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, cityAt, addressQuery, nearestAddress,
-} from './lib.js?v=20261123e';
-import { DICT, LIB } from './i18n.js?v=20261123e';
+} from './lib.js?v=20261123f';
+import { DICT, LIB } from './i18n.js?v=20261123f';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -325,7 +325,7 @@ function langSwitch() {
   return `<div role="radiogroup" aria-label="${t('lang')}" class="inline-flex p-0.5 rounded-full bg-muted border border-line">${b('ru', 'RU', 'Русский')}${b('en', 'EN', 'English')}${b('kk', 'KZ', 'Қазақша')}</div>`;
 }
 
-const LOGO_SVG = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="13" fill="#1f5750"/><path d="M14 18h20l-1.6 17.2a3 3 0 0 1-3 2.8H18.6a3 3 0 0 1-3-2.8z" fill="#f7ecd6"/><path d="M19.5 18v-1.5a4.5 4.5 0 0 1 9 0V18" fill="none" stroke="#f7ecd6" stroke-width="2.6" stroke-linecap="round"/><path d="M24 33.5c-3.8-1.4-5.4-4.7-4.4-8.6 3.9-.6 6.6 1.3 7.3 4.6" fill="#2f7d6d"/><path d="M24 33.5c.4-3.6 2.4-6.4 6-7.6.7 3.9-1.5 6.9-6 7.6z" fill="#3fa58d"/></svg>';
+const LOGO_SVG = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="13" fill="#183d32"/><path d="M14 18h20l-1.6 17.2a3 3 0 0 1-3 2.8H18.6a3 3 0 0 1-3-2.8z" fill="#f7f6f1"/><path d="M19.5 18v-1.5a4.5 4.5 0 0 1 9 0V18" fill="none" stroke="#f7f6f1" stroke-width="2.6" stroke-linecap="round"/><path d="M24 33.5c-3.8-1.4-5.4-4.7-4.4-8.6 3.9-.6 6.6 1.3 7.3 4.6" fill="#183d32"/><path d="M24 33.5c.4-3.6 2.4-6.4 6-7.6.7 3.9-1.5 6.9-6 7.6z" fill="#bf684b"/></svg>';
 function initials(u) {
   const src = (u?.name || u?.email || 'CS').trim();
   const parts = src.split(/[\s._@-]+/).filter((w) => /^\p{L}/u.test(w));
@@ -413,7 +413,7 @@ function placeCard(p, eager) {
           <div class="flex items-center gap-1.5 text-xs ${soonCls(o)}">${icon('clock', 'w-3.5 h-3.5')}<span class="numeric">${esc(timeText(o))}</span></div>
           <div class="flex items-center gap-2">
             <span class="px-1.5 py-0.5 rounded-md bg-brand-soft text-brand dark:text-emerald-300 text-[11px] font-bold">−${o.discount}%</span>
-            <div class="flex flex-col items-end leading-tight"><del class="text-[11px] text-sub numeric">${fmtKzt(o.ref)}</del><span class="text-base font-extrabold text-ink numeric">${fmtKzt(o.price)}</span></div>
+            <div class="flex flex-col items-end leading-tight"><del class="text-[11px] text-sub numeric">${fmtKzt(o.ref)}</del><span class="text-lg font-extrabold cs-price numeric">${fmtKzt(o.price)}</span></div>
           </div>
         </div>
       </div>
@@ -484,7 +484,7 @@ function renderFeed() {
       ${cats.map((c) => `<button aria-pressed="${state.cat === c}" data-cat="${c}" class="shrink-0 h-9 px-4 rounded-full text-[13px] font-semibold border transition ${state.cat === c ? 'bg-ink text-canvas border-ink' : 'bg-surface text-ink border-line'}">${t(`cat.${c}`)}</button>`).join('')}
     </div>
     <div class="px-4 pb-6 md:pb-12 space-y-4">
-      <div class="flex items-baseline justify-between pt-2"><h3 class="text-lg md:text-2xl font-bold text-ink">${t('feed.today')}</h3><span class="text-xs md:text-sm text-sub">${state.status === 'ready' ? esc(t('feed.count', { n: list.length, r: state.radius / 1000 })) + ' · ' : ''}${t('feed.until')}</span></div>
+      <div class="flex items-baseline justify-between pt-2"><h3 class="text-xl md:text-3xl font-bold text-ink cs-serif">${t('feed.today')}</h3><span class="text-xs md:text-sm text-sub">${state.status === 'ready' ? esc(t('feed.count', { n: list.length, r: state.radius / 1000 })) + ' · ' : ''}${t('feed.until')}</span></div>
       ${body}
     </div>`, 'feed');
   const qi = document.getElementById('q');
@@ -569,7 +569,7 @@ function renderPlace(id) {
           </div>
         </div>
         <footer class="fixed md:static bottom-0 inset-x-0 mx-auto max-w-[430px] md:max-w-none md:mt-6 bg-surface border-t md:border border-line md:rounded-[18px] md:card-shadow p-4 pb-6 md:pb-4 flex items-center gap-4 z-20">
-          <div class="shrink-0"><div class="flex items-baseline gap-2"><del class="text-xs text-sub numeric">${fmtKzt(o.ref)}</del><strong class="text-xl font-extrabold text-ink numeric">${fmtKzt(o.price)}</strong></div>
+          <div class="shrink-0"><div class="flex items-baseline gap-2"><del class="text-xs text-sub numeric">${fmtKzt(o.ref)}</del><strong class="text-2xl font-extrabold cs-price numeric">${fmtKzt(o.price)}</strong></div>
             <div class="text-[11px] text-sub">${t('l.fee', { fee: fmtKzt(o.fee) })}</div></div>
           <div class="flex-1"><button class="${BTN_PRIMARY}" data-action="book" data-id="${esc(p.id)}" ${o.left ? '' : 'disabled'}>${o.left ? t('l.book') : t('l.soldOut')}</button></div>
         </footer>
