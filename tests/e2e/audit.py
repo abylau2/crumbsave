@@ -172,7 +172,7 @@ def static_checks():
     rec("Статика", "все локальные файлы на месте", not missing, missing)
     cc = subprocess.run(["python3", "/tmp/classcheck.py"], capture_output=True, text=True, cwd=SRC).stdout.strip()
     m = re.search(r"missing: (\[.*\])", cc)
-    miss = [x for x in (eval(m.group(1)) if m else []) if re.fullmatch(r"[a-z][a-z0-9:\[\]./%_-]*", x) and x not in ("auth-err", "return", "hide-geo") and not re.search(r"data-|aria|application|password|pay-body|vendor|var\(|confirm|modal|geo-pop|close|paid|kaspi|cs-|pulse|ticket|qr|toast|skel|input|leaflet|pay-", x)]
+    miss = [x for x in (eval(m.group(1)) if m else []) if re.fullmatch(r"[a-z][a-z0-9:\[\]./%_-]*", x) and x not in ("auth-err", "return", "hide-geo", "moveend", "zoomend") and not re.search(r"data-|aria|application|password|pay-body|vendor|var\(|confirm|modal|geo-pop|close|paid|kaspi|cs-|pulse|ticket|qr|toast|skel|input|leaflet|pay-", x)]
     rec("Статика", "у всех CSS-классов есть стили", not miss, miss[:20])
 
 # ---------- страницы ----------
@@ -342,6 +342,26 @@ def scenarios(b):
     page.wait_for_timeout(1500)
     lbl = page.inner_text("[data-action=pop]")
     rec(G, "при разрешённой геолокации — «Рядом с вами» и места вокруг", "Рядом" in lbl, lbl); ctx.close()
+    # 11б. Преподаватель в Астане: GPS разрешён
+    ctx, page, _ = new_ctx(b, geo={"latitude": 51.1282, "longitude": 71.4304}); goto(page, "#/feed"); wait_feed(page)
+    page.click("[data-action=pop]"); page.click(".geo-pop [data-action=locate]"); page.wait_for_timeout(2000)
+    msg = " ".join(page.locator("[role=status]").all_inner_texts()); lbl = page.inner_text("[data-action=pop]")
+    rec(G, "Астана (GPS): плашка «только в Алматы», лента Алматы работает", "только в Алматы" in msg and "Алматы" in lbl and page.locator("h4").count() > 0 and "км" in msg, f"{lbl} | {msg}")
+    goto(page, "#/map"); page.wait_for_selector(".leaflet-container"); page.wait_for_timeout(800)
+    rec(G, "Астана: карта показывает Алматы", page.locator(".leaflet-marker-icon").count() > 0); ctx.close()
+    # 11в. Астана без GPS (по сети)
+    class AstanaIP(Mock):
+        def install(self, ctx):
+            super().install(ctx)
+            ctx.route("**/ipwho.is/**", lambda r: r.fulfill(status=200, content_type="application/json", headers={"access-control-allow-origin": "*"}, body=json.dumps({"success": True, "city": "Astana", "latitude": 51.1694, "longitude": 71.4491})))
+    ctx, page, _ = new_ctx(b, mock=AstanaIP()); goto(page, "#/feed"); wait_feed(page)
+    page.click("[data-action=pop]"); page.click(".geo-pop [data-action=locate]"); page.wait_for_timeout(2000)
+    msg = " ".join(page.locator("[role=status]").all_inner_texts())
+    rec(G, "Астана (по сети): та же плашка, без «(примерно)»", "только в Алматы" in msg and "примерно)" not in page.inner_text("[data-action=pop]"), msg); ctx.close()
+    # 11г. Карта: подписи меток не перекрываются
+    ctx, page, _ = new_ctx(b); goto(page, "#/map"); page.wait_for_selector(".leaflet-marker-icon"); page.wait_for_timeout(1000)
+    ov = page.evaluate('''() => { const r = [...document.querySelectorAll('.leaflet-marker-icon')].map(e => e.firstElementChild ? e.firstElementChild.getBoundingClientRect() : e.getBoundingClientRect()); let n = 0; for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) { const a = r[i], c = r[j]; if (a.left < c.right - 2 && c.left < a.right - 2 && a.top < c.bottom - 2 && c.top < a.bottom - 2) n++; } return [r.length, n]; }''')
+    rec(G, "карта: подписи меток не налезают друг на друга", ov[0] > 3 and ov[1] == 0, ov); ctx.close()
     # 12. GPS запрещён и IP не работает
     m = Mock(); m.ip_ok = False
     ctx, page, _ = new_ctx(b, mock=m); goto(page, "#/feed"); wait_feed(page)

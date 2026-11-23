@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, logoText, addressQuery, nearestAddress,
-} from './lib.js?v=20261123b';
-import { DICT, LIB } from './i18n.js?v=20261123b';
+} from './lib.js?v=20261123c';
+import { DICT, LIB } from './i18n.js?v=20261123c';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -141,14 +141,18 @@ async function locate() {
     let r = await gpsOnce({ enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 });
     if (r.err && r.err.code !== 1) r = await gpsOnce({ enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
     if (r.pos) {
-      setLoc({ lat: r.pos.coords.latitude, lng: r.pos.coords.longitude }, 'gps');
-      state.geoBusy = false; return true;
+      state.geoBusy = false;
+      const here = { lat: r.pos.coords.latitude, lng: r.pos.coords.longitude };
+      if (outsideService(here)) return true;
+      setLoc(here, 'gps');
+      return true;
     }
     err = r.err;
   }
   const ip = await ipLocate();
   state.geoBusy = false;
-  if (ip && Math.abs(ip.lat - ALMATY.lat) < 1 && Math.abs(ip.lng - ALMATY.lng) < 1.5) {
+  if (ip && outsideService(ip)) return true;
+  if (ip) {
     setLoc(ip, 'ip'); state.ipCity = ip.city; sess.set('cs_ipcity', ip.city);
     state.geoInfo = true;
     state.geoMsg = t(err && err.code === 1 ? 'geo.ipDenied' : 'geo.ipApprox');
@@ -156,6 +160,17 @@ async function locate() {
   }
   state.geoMsg = err ? geoErrorText(err) : t('geo.unsupported');
   return false;
+}
+// Сервис пока работает только в Алматы: если человек дальше 40 км — показываем центр Алматы и объясняем почему.
+const SERVICE_RADIUS = 40000;
+function outsideService(loc) {
+  const d = haversine(loc, ALMATY);
+  if (d <= SERVICE_RADIUS) return false;
+  setDistrict('center');
+  state.geoInfo = true;
+  const km = Math.round(d / 1000);
+  state.geoMsg = t('geo.onlyAlmaty', { km: km >= 1000 ? km.toLocaleString('ru-RU') : km });
+  return true;
 }
 function setDistrict(id) {
   const d = DISTRICTS.find((x) => x.id === id) || DISTRICTS[0];
@@ -575,31 +590,49 @@ async function renderMap() {
   if (state.source === 'gps' || state.source === 'ip') {
     L.circleMarker([c.lat, c.lng], { radius: 9, color: '#fff', weight: 3, fillColor: '#2563eb', fillOpacity: 1 }).addTo(mapInst).bindTooltip(t('near'));
   }
-  const dots = L.layerGroup().addTo(mapInst);
-  state.places.slice(0, 400).forEach((p, idx) => {
-    const o = offerFor(p);
-    let marker;
-    if (idx >= 40) {
-      marker = L.circleMarker([p.lat, p.lng], { radius: 6, color: '#fff', weight: 2, fillColor: '#1f5750', fillOpacity: 0.9 }).addTo(dots);
-      marker.bindTooltip(p.name, { direction: 'top', offset: [0, -6] });
-    }
-    const pill = document.createElement('div');
-    pill.style.cssText = 'display:inline-flex;width:max-content;align-items:center;gap:4px;padding:3px 8px 3px 3px;border-radius:999px;background:var(--surface);border:1px solid var(--border);box-shadow:0 2px 8px rgb(0 0 0 / 15%);font:700 11px system-ui;color:var(--text)';
-    const img = document.createElement('img'); img.alt = ''; if (idx < 40) img.src = photoFor(p, 80); img.loading = 'lazy';
-    img.style.cssText = 'width:22px;height:22px;border-radius:999px;object-fit:cover';
-    const cnt = document.createElement('span'); cnt.style.color = 'var(--brand)'; cnt.textContent = String(o.left);
-    pill.append(img, document.createTextNode(p.name.length > 22 ? `${p.name.slice(0, 21)}…` : p.name), cnt);
-    if (!marker) marker = L.marker([p.lat, p.lng], { icon: L.divIcon({ html: pill, className: '', iconSize: null, iconAnchor: [14, 14] }), zIndexOffset: 1000 - idx }).addTo(mapInst);
+  const list = state.places.slice(0, 400);
+  const popupFor = (p, o) => {
     const box = document.createElement('div'); box.className = 'space-y-1 min-w-[180px]';
     const a = document.createElement('a'); a.className = 'font-bold'; a.href = `#/place/${p.id}`; a.textContent = p.name;
     const ad = document.createElement('div'); ad.className = 'text-xs'; ad.textContent = p.address || tr(p.kind);
     const ol = document.createElement('a'); ol.className = 'block text-xs'; ol.href = `#/place/${p.id}`;
-    ol.append(document.createTextNode(`${tr(o.title)} — `)); const b = document.createElement('b'); b.textContent = fmtKzt(o.price); ol.append(b);
+    ol.append(document.createTextNode(`${tr(o.title)} — `)); const bb = document.createElement('b'); bb.textContent = fmtKzt(o.price); ol.append(bb);
     box.append(a, ad, ol);
-    marker.bindPopup(box);
-    pts.push([p.lat, p.lng]);
+    return box;
+  };
+  // Все заведения — аккуратные точки; подписи — только тем, что не перекрывают друг друга (больше при приближении).
+  const dots = L.layerGroup().addTo(mapInst);
+  const labels = L.layerGroup().addTo(mapInst);
+  list.forEach((p) => {
+    L.circleMarker([p.lat, p.lng], { radius: 6, color: '#fff', weight: 2, fillColor: '#1f5750', fillOpacity: 0.9 })
+      .bindTooltip(p.name, { direction: 'top', offset: [0, -6] }).bindPopup(() => popupFor(p, offerFor(p))).addTo(dots);
   });
+  const layout = () => {
+    if (!mapInst) return;
+    labels.clearLayers();
+    const size = mapInst.getSize(); const taken = []; let n = 0;
+    for (const p of list) {
+      if (n >= 30) break;
+      const pt = mapInst.latLngToContainerPoint([p.lat, p.lng]);
+      if (pt.x < 0 || pt.y < 0 || pt.x > size.x || pt.y > size.y) continue;
+      const name = p.name.length > 22 ? `${p.name.slice(0, 21)}…` : p.name;
+      const w = 48 + name.length * 6.6; const r = { x1: pt.x - 16, y1: pt.y - 16, x2: pt.x - 16 + w, y2: pt.y + 16 };
+      if (taken.some((q) => !(r.x2 + 6 < q.x1 || r.x1 - 6 > q.x2 || r.y2 + 4 < q.y1 || r.y1 - 4 > q.y2))) continue;
+      taken.push(r); n += 1;
+      const o = offerFor(p);
+      const pill = document.createElement('div');
+      pill.style.cssText = 'display:inline-flex;width:max-content;align-items:center;gap:4px;padding:3px 8px 3px 3px;border-radius:999px;background:var(--surface);border:1px solid var(--border);box-shadow:0 2px 8px rgb(0 0 0 / 15%);font:700 11px system-ui;color:var(--text)';
+      const img = document.createElement('img'); img.alt = ''; img.src = photoFor(p, 80);
+      img.style.cssText = 'width:22px;height:22px;border-radius:999px;object-fit:cover';
+      const cnt = document.createElement('span'); cnt.style.color = 'var(--brand)'; cnt.textContent = String(o.left);
+      pill.append(img, document.createTextNode(name), cnt);
+      L.marker([p.lat, p.lng], { icon: L.divIcon({ html: pill, className: '', iconSize: null, iconAnchor: [14, 14] }), zIndexOffset: 1000 - n })
+        .bindPopup(() => popupFor(p, o)).addTo(labels);
+    }
+  };
+  mapInst.on('zoomend moveend', layout);
   mapInst.fitBounds(ring.getBounds(), { padding: [20, 20] });
+  layout();
 }
 
 // --- аккаунт (демо: только в браузере) ---
