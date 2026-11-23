@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, cityAt, addressQuery, nearestAddress,
-} from './lib.js?v=20261123i';
-import { DICT, LIB } from './i18n.js?v=20261123i';
+} from './lib.js?v=20261123j';
+import { DICT, LIB } from './i18n.js?v=20261123j';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -672,9 +672,9 @@ function requireLogin(next) {
   return false;
 }
 const AUTH_FALLBACK = [
-  { kind: 'Кондитерская', name: 'Kulikov', title: 'Сладкий набор', window: 'Сегодня 21:00–22:00', price: 1190, off: 67, tint: '#f4ead6' },
-  { kind: 'Кафе', name: 'Degirmen', title: 'Набор готовых блюд', window: 'Сегодня 22:00–23:00', price: 1390, off: 63, tint: '#f1dccb' },
-  { kind: 'Кофейня', name: 'Coffee Boom', title: 'Кофейный набор: десерты и сэндвичи', window: 'Сегодня 21:30–23:00', price: 1290, off: 66, tint: '#ebe2d8' },
+  { id: 'n13068308697', cat: 'bakery', kind: 'Кондитерская', name: 'Kulikov', title: 'Сладкий набор', window: 'Сегодня 21:00–22:00', price: 1190, off: 67, tint: '#f4ead6' },
+  { id: 'n10183683621', cat: 'ready', kind: 'Кафе', name: 'Degirmen', cuisine: 'turkish', title: 'Набор готовых блюд', window: 'Сегодня 22:00–23:00', price: 1390, off: 63, tint: '#f1dccb' },
+  { id: 'n1', cat: 'ready', kind: 'Кофейня', name: 'Coffee Boom', cuisine: 'coffee_shop', title: 'Кофейный набор: десерты и сэндвичи', window: 'Сегодня 21:30–23:00', price: 1290, off: 66, tint: '#ebe2d8' },
 ];
 function authBags() {
   const picks = [];
@@ -685,7 +685,7 @@ function authBags() {
     seen.add(p.cat); picks.push({ kind: p.kind, name: p.name, title: o.title, window: o.window, price: o.price, off: o.discount, img: photoFor(p) });
     if (picks.length === 3) break;
   }
-  const list = picks.length === 3 ? picks : AUTH_FALLBACK;
+  const list = picks.length === 3 ? picks : AUTH_FALLBACK.map((b) => ({ ...b, img: photoFor(b) }));
   return list.map((b, i) => `<div class="cs-fan-card cs-fan-${i}" aria-hidden="true">
       <div class="cs-fan-ph" style="background:${b.tint || 'var(--surface-muted)'}">${b.img ? `<img alt="" src="${esc(b.img)}" loading="lazy" decoding="async">` : ''}<span class="cs-off">−${b.off}%</span></div>
       <div class="cs-fan-body"><span class="cs-eyebrow" style="font-size:10px">${esc(tr(b.kind))}</span><b>${esc(b.name)} · ${esc(tr(b.title))}</b>
