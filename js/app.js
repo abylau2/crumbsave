@@ -2,8 +2,8 @@ import {
   ALMATY, DISTRICTS, esc, haversine, fmtDist, fmtKzt, luhn, validExpiry, OVERPASS_ENDPOINTS, overpassQuery,
   parseElements, twoGisUrl, demoOffer, newOrderId, newPin, b64urlEncode, b64urlDecode,
   packOrder, unpackOrder, photoFor, cityAt, addressQuery, nearestAddress,
-} from './lib.js?v=20261123f';
-import { DICT, LIB } from './i18n.js?v=20261123f';
+} from './lib.js?v=20261123g';
+import { DICT, LIB } from './i18n.js?v=20261123g';
 
 const CFG = window.CRUMBSAVE_CONFIG || {};
 const root = document.getElementById('root');
@@ -56,6 +56,7 @@ const state = {
   district: sess.get('cs_district', ''),
   radius: sess.get('cs_radius', 2000),
   cat: 'all',
+  sort: 'near',
   q: '',
   searchOpen: false,
   places: [],
@@ -342,7 +343,7 @@ function headerHtml(active) {
   return `<header class="cs-header hidden md:block"><div class="cs-hwrap">
       <a class="cs-brand" href="#/feed" aria-label="CrumbSave — ${t('nav.feed')}">${LOGO_SVG}CrumbSave</a>
       <nav class="cs-nav" aria-label="${t('nav.main')}">
-        ${nav.map(([k, ic, key]) => `<a ${active === k ? 'aria-current="page"' : ''} href="#/${k}">${icon(ic, 'w-[18px] h-[18px]')}${t(key)}${k === 'orders' && n ? `<span class="cs-badge" aria-label="${n}">${n}</span>` : ''}</a>`).join('')}
+        ${nav.map(([k, ic, key]) => `<a ${active === k ? 'aria-current="page"' : ''} href="#/${k}">${t(key)}${k === 'orders' && n ? `<span class="cs-badge" aria-label="${n}">${n}</span>` : ''}</a>`).join('')}
       </nav>
       ${user
     ? `<a class="cs-user" href="#/profile" ${active === 'profile' ? 'aria-current="page"' : ''}><span class="cs-ava">${esc(initials(user))}</span>${esc(user.name || user.email.split('@')[0])}</a>`
@@ -390,35 +391,28 @@ function venueIcon(p) {
 
 function placeCard(p, eager) {
   const o = offerFor(p);
-  const lowCls = o.left <= 1 ? 'bg-urgent-soft text-urgent' : 'bg-surface/95 text-ink';
+  const last = o.left === 1;
   const fav = isFav(p.id);
-  return `<div class="relative bg-surface rounded-[18px] border border-line card-shadow overflow-hidden md:hover:-translate-y-0.5 md:hover:shadow-lg transition">
-    <a class="block" href="#/place/${esc(p.id)}">
-      <div class="relative aspect-[16/10] bg-muted">
-        <img alt="${esc(tr(o.title))}" class="w-full h-full object-cover" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" width="640" height="400" src="${esc(photoFor(p))}">
-        <span class="absolute left-3 bottom-3 px-2.5 py-1 rounded-full text-[11px] font-bold ${lowCls}">${esc(leftText(o.left))}</span>
-        <span class="absolute left-3 top-2 mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-ink text-canvas">${t('demo')}</span>
+  const soon = o.minsLeft != null && o.open && o.minsLeft <= 60;
+  return `<div class="cs-card relative">
+    <a class="cs-card-link" href="#/place/${esc(p.id)}">
+      <div class="cs-card-ph">
+        <img alt="${esc(tr(o.title))}" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" width="640" height="480" src="${esc(photoFor(p))}">
+        <span class="cs-left ${last || o.left === 0 ? 'is-last' : ''}">${esc(last ? t('left.last') : leftText(o.left))}</span>
+        <span class="cs-off">−${o.discount}%</span>
       </div>
-      <div class="p-4 space-y-3">
-        <div class="flex items-center gap-3">
-          ${venueIcon(p)}
-          <div class="min-w-0">
-            <div class="flex items-center gap-2"><h4 class="font-bold text-[15px] text-ink truncate">${esc(p.name)}</h4>
-              ${p.distance != null ? `<span class="flex items-center gap-0.5 text-xs font-semibold text-ink shrink-0">${icon('pin', 'w-3 h-3')} ${esc(fmtDist(p.distance))}</span>` : ''}</div>
-            <p class="text-xs text-sub truncate">${esc(tr(p.kind))}${p.address ? ` · ${esc(p.address)}` : ''}</p>
-          </div>
-        </div>
-        <p class="text-sm text-ink">${esc(tr(o.title))}</p>
-        <div class="flex items-end justify-between">
-          <div class="flex items-center gap-1.5 text-xs ${soonCls(o)}">${icon('clock', 'w-3.5 h-3.5')}<span class="numeric">${esc(timeText(o))}</span></div>
-          <div class="flex items-center gap-2">
-            <span class="px-1.5 py-0.5 rounded-md bg-brand-soft text-brand dark:text-emerald-300 text-[11px] font-bold">−${o.discount}%</span>
-            <div class="flex flex-col items-end leading-tight"><del class="text-[11px] text-sub numeric">${fmtKzt(o.ref)}</del><span class="text-lg font-extrabold cs-price numeric">${fmtKzt(o.price)}</span></div>
-          </div>
+      <div class="cs-card-body">
+        <span class="cs-eyebrow">${esc(tr(p.kind))}</span>
+        <h4 class="cs-card-title">${esc(tr(o.title))}</h4>
+        <p class="cs-card-meta"><b>${esc(p.name)}</b>${p.address ? ` · ${esc(p.address)}` : ''}${p.distance != null ? ` · ${esc(fmtDist(p.distance))}` : ''}</p>
+        <p class="cs-card-time"><span class="cs-eyebrow cs-eyebrow-sub">${t('card.pickup')}</span><b class="numeric ${soon ? 'text-urgent' : ''}">${esc(timeText(o))}</b></p>
+        <div class="cs-card-foot">
+          <span class="flex items-baseline gap-2"><span class="cs-price-lg numeric">${fmtKzt(o.price)}</span><del class="text-[13px] text-sub numeric">${fmtKzt(o.ref)}</del></span>
+          <span class="cs-take">${t('card.take')} <span aria-hidden="true">↗</span></span>
         </div>
       </div>
     </a>
-    <button aria-label="${esc(fav ? t('fav.remove') : t('fav.add', { name: p.name }))}" aria-pressed="${fav}" data-fav="${esc(p.id)}" class="absolute top-2 right-2 w-11 h-11 flex items-center justify-center"><span class="w-9 h-9 rounded-full bg-surface/95 flex items-center justify-center shadow">${icon('heart', `w-[18px] h-[18px] ${fav ? 'text-urgent' : 'text-ink'}`, fav ? 'currentColor' : 'none')}</span></button>
+    <button aria-label="${esc(fav ? t('fav.remove') : t('fav.add', { name: p.name }))}" aria-pressed="${fav}" data-fav="${esc(p.id)}" class="cs-fav">${icon('heart', `w-[18px] h-[18px] ${fav ? 'text-urgent' : 'text-ink'}`, fav ? 'currentColor' : 'none')}</button>
   </div>`;
 }
 
@@ -465,28 +459,52 @@ function cityRow(withSearch) {
 }
 
 // ---------- экраны ----------
+const SORTS = ['near', 'cheap', 'soon'];
+function sortList(list) {
+  const key = state.sort || 'near';
+  if (key === 'near') return list;
+  const val = (p) => { const o = offerFor(p); return key === 'cheap' ? o.price : (o.open && o.minsLeft != null ? o.minsLeft : 10000 + (parseInt(o.closes, 10) || 0) * 60); };
+  return list.map((p, i) => ({ p, i, v: val(p) })).sort((x, y) => x.v - y.v || x.i - y.i).map((x) => x.p);
+}
 function renderFeed() {
   const cats = ['all', 'bakery', 'ready', 'groceries'];
   const q = state.q.trim().toLowerCase();
-  const list = state.places.filter((p) => (state.cat === 'all' || p.cat === state.cat) && (!q || p.name.toLowerCase().includes(q)))
-    .map((p, i) => ({ p, i, out: offerFor(p).left === 0 ? 1 : 0 })).sort((a, b) => a.out - b.out || a.i - b.i).map((x) => x.p);
+  let list = state.places.filter((p) => (state.cat === 'all' || p.cat === state.cat) && (!q || p.name.toLowerCase().includes(q)));
+  list = sortList(list).map((p, i) => ({ p, i, out: offerFor(p).left === 0 ? 1 : 0 })).sort((a, b) => a.out - b.out || a.i - b.i).map((x) => x.p);
   let body;
   if (state.status === 'loading' || state.status === 'idle') body = `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 md:gap-5">${skeletonCards()}</div>`;
-  else if (state.status === 'error') body = `<div class="bg-urgent-soft text-urgent rounded-[18px] p-4 text-sm font-semibold flex items-center justify-between gap-3" role="alert"><span>${t('load.error')}</span><button class="h-9 px-4 rounded-full bg-surface text-ink border border-line" data-action="retry">${t('retry')}</button></div>`;
+  else if (state.status === 'error') body = `<div class="bg-urgent-soft text-urgent rounded-[13px] p-4 text-sm font-semibold flex items-center justify-between gap-3" role="alert"><span>${t('load.error')}</span><button class="h-9 px-4 rounded-lg bg-surface text-ink border border-line" data-action="retry">${t('retry')}</button></div>`;
   else if (!list.length) body = `<div class="text-center space-y-2 pt-10"><h3 class="text-xl font-bold text-ink">${t('empty.title')}</h3><p class="text-sm text-sub">${t('empty.text')}</p></div>`;
   else body = `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 md:gap-5">${list.slice(0, state.shown).map((p, i) => placeCard(p, i < 3)).join('')}</div>
-    ${list.length > state.shown ? `<div class="flex justify-center pt-2"><button class="h-11 px-6 rounded-full bg-surface border border-line text-ink text-sm font-bold hover:bg-muted" data-action="more">${t('feed.more', { n: Math.min(24, list.length - state.shown) })}</button></div>` : ''}`;
+    ${list.length > state.shown ? `<div class="flex justify-center pt-2"><button class="h-11 px-6 rounded-lg bg-surface border border-line text-ink text-sm font-bold hover:bg-muted" data-action="more">${t('feed.more', { n: Math.min(24, list.length - state.shown) })}</button></div>` : ''}`;
+  const total = state.places.length;
   shell(`
-    ${cityRow(true)}
-    ${state.searchOpen ? `<div class="px-4 pb-2"><input id="q" class="input" placeholder="${t('searchPh')}" value="${esc(state.q)}" aria-label="${t('search')}"></div>` : ''}
+    <section class="cs-hero px-4">
+      <div class="cs-hero-l">
+        <div class="relative">
+          <button class="cs-eyebrow cs-eyebrow-btn" aria-label="${t('pickDistrict')}" aria-expanded="${state.popOpen}" data-action="pop">${esc(locLabel() === cityName(state.loc) ? locLabel() : `${cityName(state.loc)} · ${locLabel()}`)} ${icon('chevron', 'w-3.5 h-3.5')}</button>
+          ${geoPopHtml()}
+        </div>
+        <h1 class="cs-h1">${t('hero.a')}<br><em>${t('hero.b')}</em></h1>
+        <p class="cs-hero-sub">${state.status === 'ready' ? esc(t('hero.sub', { n: total, r: state.radius / 1000 })) : t('hero.subLoading')}</p>
+      </div>
+      <div class="cs-hero-r">
+        ${state.source !== 'gps' ? `<button class="cs-btn-ghost" data-action="locate" ${state.geoBusy ? 'disabled' : ''}>${icon('locate', 'w-4 h-4')}${state.geoBusy ? t('geo.busy') : t('geo.btn')}</button>` : ''}
+        <label class="cs-search">${icon('search', 'w-[18px] h-[18px]')}<span class="sr-only">${t('search')}</span><input id="q" type="search" placeholder="${t('searchPh')}" value="${esc(state.q)}"></label>
+      </div>
+    </section>
     ${geoMsgHtml()}
-    <div class="flex gap-2 px-4 py-2 overflow-x-auto no-scrollbar">
-      ${cats.map((c) => `<button aria-pressed="${state.cat === c}" data-cat="${c}" class="shrink-0 h-9 px-4 rounded-full text-[13px] font-semibold border transition ${state.cat === c ? 'bg-ink text-canvas border-ink' : 'bg-surface text-ink border-line'}">${t(`cat.${c}`)}</button>`).join('')}
-    </div>
-    <div class="px-4 pb-6 md:pb-12 space-y-4">
-      <div class="flex items-baseline justify-between pt-2"><h3 class="text-xl md:text-3xl font-bold text-ink cs-serif">${t('feed.today')}</h3><span class="text-xs md:text-sm text-sub">${state.status === 'ready' ? esc(t('feed.count', { n: list.length, r: state.radius / 1000 })) + ' · ' : ''}${t('feed.until')}</span></div>
+    <section class="px-4 pb-6 md:pb-12 space-y-4 cs-menu">
+      <div class="flex items-end justify-between gap-4 flex-wrap">
+        <div class="space-y-2"><span class="cs-eyebrow">${t('menu.eyebrow')}</span><h2 class="cs-h2">${t('menu.a')} <em>${t('menu.b')}</em></h2></div>
+        <div class="cs-seg" role="group" aria-label="${t('sort.label')}">${SORTS.map((k) => `<button data-sort="${k}" aria-pressed="${(state.sort || 'near') === k}">${t(`sort.${k}`)}</button>`).join('')}</div>
+      </div>
+      <div class="flex gap-2 items-center flex-wrap">
+        ${cats.map((c) => `<button aria-pressed="${state.cat === c}" data-cat="${c}" class="cs-chip">${t(`cat.${c}`)}</button>`).join('')}
+        <span class="ml-auto text-[13px] text-sub">${t('demo.note')}</span>
+      </div>
       ${body}
-    </div>`, 'feed');
+    </section>`, 'feed');
   const qi = document.getElementById('q');
   if (qi && state.searchOpen) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
 }
@@ -1047,7 +1065,7 @@ root.addEventListener('click', async (e) => {
     if (w) { try { w.opener = null; } catch { /* ignore */ } w.location.href = url; } else location.href = url;
     return;
   }
-  const tEl = e.target.closest('[data-action],[data-cat],[data-tab],[data-fav],[data-lang],[data-radius],[data-district],[data-next]');
+  const tEl = e.target.closest('[data-action],[data-cat],[data-sort],[data-tab],[data-fav],[data-lang],[data-radius],[data-district],[data-next]');
   if (!tEl) {
     if (state.popOpen && !e.target.closest('.geo-pop')) { state.popOpen = false; refresh(); }
     return;
@@ -1055,6 +1073,7 @@ root.addEventListener('click', async (e) => {
   const d = tEl.dataset;
   if (d.next) { sess.set('cs_next', d.next); return; }
   if (d.cat) { state.cat = d.cat; state.shown = 24; renderFeed(); return; }
+  if (d.sort) { state.sort = d.sort; state.shown = 24; renderFeed(); return; }
   if (d.tab) { sess.set('cs_paytab', d.tab); route(); return; }
   if (d.lang) { setLang(d.lang); return; }
   if (d.radius) { state.radius = Number(d.radius); sess.set('cs_radius', state.radius); state.popOpen = false; loadPlaces().then(() => { if (state.status === 'ready') toast(t('feed.count', { n: state.places.length, r: state.radius / 1000 })); }); return; }
@@ -1101,7 +1120,7 @@ root.addEventListener('click', async (e) => {
   }
 });
 root.addEventListener('input', (e) => {
-  if (e.target.id === 'q') { state.q = e.target.value; renderFeed(); }
+  if (e.target.id === 'q') { state.q = e.target.value; state.searchOpen = true; renderFeed(); }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.popOpen) { state.popOpen = false; refresh(); } });
 window.addEventListener('hashchange', () => { navDepth += 1; route(); });
